@@ -64,11 +64,12 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 - **다크모드**: `.dark`에서 Semantic만 재매핑. 화면 코드에 `dark:` 유틸리티를 쓰지 말 것
 - 임의 값(`text-[14px]`, `bg-[#fff]`) 사용 금지. 기존 토큰으로 흡수하거나 토큰을 추가
 
-타이포 토큰 (size / line-height): `text-count`(11/13) `text-caption`(12/14) `text-label`(13/16)
-`text-body`(15/18) `text-title-sm`(17/20) `text-title-lg`(22/26) `text-nav`(22/26) `text-kpi`(40/48)
+타이포 토큰: `text-count`(11) `text-caption`(12) `text-label`(13) `text-body`(15) `text-title-sm`(17) `text-title-lg`(22) `text-nav`(22) `text-kpi`(40)
 
-line-height가 토큰에 포함되어 있으므로 화면 코드에 `leading-*`를 쓰지 말 것.
-13/16과 17/20만 Figma 실측이고 나머지는 동일 비율(1.2 반올림) 파생값 — 확인 필요.
+- **line-height는 전 토큰 `normal`** (폰트 메트릭). Figma가 전부 Auto이므로 동일하게 맞춘 것.
+  Pretendard의 normal 비율은 1.176 — 17px→20px으로 Figma 실측값과 일치한다.
+- **px로 고정하지 말 것.** 고정하면 폰트 메트릭과 어긋난다
+- 화면 코드에 `leading-*`를 쓰지 말 것 (토큰이 이미 지정)
 
 폰트: Pretendard Variable / 아이콘: Lucide outline
 
@@ -88,9 +89,9 @@ line-height가 토큰에 포함되어 있으므로 화면 코드에 `leading-*`�
 ## 현재 상태
 
 완료: 환경 셋업, 토큰 이식, 3분할 셸 + 라우터(5화면 빈 컴포넌트), 좌측 네비 전체,
-홈(업무) 화면 중앙 2컬럼(빠른 저작 · 미배정 · 일정 타임라인)
+홈(업무) 화면 중앙 2컬럼(빠른 저작 · 미배정 · 일정 타임라인), 우측 환자 패널(셸 전역)
 
-다음: 홈 화면 우측 환자 패널 → 코어 프로세스 6단계
+다음: 코어 프로세스 6단계
 
 미해결:
 - 실기기 논리 해상도 실측 (기기 미수령). Figma 프레임 1138×712도 추정값

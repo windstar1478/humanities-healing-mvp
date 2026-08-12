@@ -8,24 +8,26 @@
 /* typography */
   --font-sans: "Pretendard Variable", system-ui, sans-serif;
 
-  /* line-height는 Figma 텍스트 박스 높이 기준. 13→16, 17→20을 실측했고
-     나머지는 동일 비율(1.2 반올림)로 맞췄다. */
+  /* Figma의 line-height가 전부 Auto(폰트 메트릭)이므로 여기서도 normal을 쓴다.
+     Pretendard의 normal 비율은 1.176 — 17px→20px으로 Figma 실측값과 일치한다.
+     px로 고정하면 폰트 메트릭과 어긋나므로 고정하지 말 것.
+     (Tailwind preflight 기본값 1.5를 덮기 위해 토큰마다 명시가 필요하다) */
   --text-count:     11px;
-  --text-count--line-height:    13px;
+  --text-count--line-height:    normal;
   --text-caption:   12px;
-  --text-caption--line-height:  14px;
+  --text-caption--line-height:  normal;
   --text-label:     13px;
-  --text-label--line-height:    16px;
+  --text-label--line-height:    normal;
   --text-body:      15px;
-  --text-body--line-height:     18px;
+  --text-body--line-height:     normal;
   --text-title-sm:  17px;
-  --text-title-sm--line-height: 20px;
+  --text-title-sm--line-height: normal;
   --text-title-lg:  22px;
-  --text-title-lg--line-height: 26px;
+  --text-title-lg--line-height: normal;
   --text-nav:       22px;
-  --text-nav--line-height:      26px;
+  --text-nav--line-height:      normal;
   --text-kpi:       40px;
-  --text-kpi--line-height:      48px;
+  --text-kpi--line-height:      normal;
 
   --color-neutral-0:   #FFFFFF;
   --color-neutral-50:  #F7F8FA;

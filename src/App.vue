@@ -3,7 +3,9 @@ import { ref } from 'vue'
 import {
   ClipboardList, CalendarDays, Users, TrendingUp, PenTool,
   Bell, Settings, Sun, Moon,
+  Search, User, ChevronRight, ArrowUpDown,
 } from 'lucide-vue-next'
+import { recentPatients, allPatients } from './mocks/patients.js'
 
 const navGroups = [
   [
@@ -98,8 +100,62 @@ function setTheme(dark) {
     </main>
 
     <!-- 우: 환자 패널 -->
-    <aside class="w-[274px] shrink-0 overflow-y-auto rounded-2xl bg-surface-container p-4">
-      환자 패널
+    <aside class="flex w-[274px] shrink-0 flex-col gap-1 overflow-y-auto rounded-2xl bg-surface-container px-6 py-4">
+      <!-- 검색 -->
+      <button class="mx-3 flex h-11 shrink-0 items-center gap-4 rounded-lg border border-border-default bg-surface-field px-3 text-text-disabled active:bg-surface-pressed">
+        <Search :size="20" class="shrink-0" />
+        <span class="text-body">환자 검색</span>
+      </button>
+
+      <!-- 최근 환자 -->
+      <section class="flex shrink-0 flex-col gap-2 pl-3 pt-1 pb-3">
+        <h2 class="flex h-11 items-center pl-1 text-label font-medium text-text-secondary">최근 환자</h2>
+        <button
+          v-for="p in recentPatients"
+          :key="p.id"
+          class="flex items-center gap-2 rounded-lg py-2 pl-1 text-left active:bg-surface-pressed"
+        >
+          <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
+            <User :size="24" />
+          </span>
+          <span class="flex min-w-0 flex-1 flex-col gap-1">
+            <span class="truncate text-title-sm font-semibold"
+              >{{ p.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ p.age }}·{{ p.sex }}</span></span>
+            <span class="truncate text-label font-medium"
+              >{{ p.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ p.status }}</span></span>
+          </span>
+        </button>
+      </section>
+
+      <div class="h-px shrink-0 bg-border-default"></div>
+
+      <!-- 전체 환자 -->
+      <section class="flex shrink-0 flex-col gap-2 pl-3 pt-2 pb-3">
+        <!-- 행 텍스트는 우측 여백까지 쓰지만, 헤더의 정렬 버튼은 안쪽에 둔다 -->
+        <div class="flex h-11 items-center gap-2 pl-1 pr-3">
+          <h2 class="text-label font-medium text-text-secondary">전체 환자</h2>
+          <ChevronRight :size="16" class="shrink-0 text-text-secondary" />
+          <div class="flex-1"></div>
+          <button class="flex size-11 shrink-0 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed">
+            <ArrowUpDown :size="16" />
+          </button>
+        </div>
+        <button
+          v-for="p in allPatients"
+          :key="p.id"
+          class="flex items-center gap-2 rounded-lg py-2 pl-1 text-left active:bg-surface-pressed"
+        >
+          <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
+            <User :size="24" />
+          </span>
+          <span class="flex min-w-0 flex-1 flex-col gap-1">
+            <span class="truncate text-title-sm font-semibold"
+              >{{ p.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ p.age }}·{{ p.sex }}</span></span>
+            <span class="truncate text-label font-medium"
+              >{{ p.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ p.status }}</span></span>
+          </span>
+        </button>
+      </section>
     </aside>
   </div>
 </template>
