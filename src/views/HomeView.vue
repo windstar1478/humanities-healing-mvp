@@ -5,6 +5,7 @@ import {
   quickAuthoringItems,
   unassignedTasks,
   scheduleDays,
+  sessionTypes,
 } from '../mocks/home.js'
 import { dragState } from '../dragState.js'
 
@@ -13,7 +14,7 @@ const days = reactive(
   scheduleDays.map((day) => ({ ...day, rows: day.rows.map((row) => ({ ...row })) })),
 )
 
-const dayIndex = ref(0)
+const dayIndex = ref(Math.max(0, days.findIndex((d) => d.isToday)))
 const day = computed(() => days[dayIndex.value])
 const rows = computed(() => day.value.rows)
 
@@ -34,8 +35,18 @@ function dropState(row) {
   return row.event || isPast(row) ? 'blocked' : 'active'
 }
 
+/*
+ * 손가락이 특정 슬롯 위에 있으면 그 슬롯만 남기고 나머지 후보의 accent를 낮춘다.
+ * 아직 아무 슬롯 위도 아니면 후보를 모두 같은 세기로 보여준다.
+ */
+function isFaded(row) {
+  return dropState(row) === 'active' && dragState.hoverHour && dragState.hoverHour !== row.hour
+}
+
 function hourClass(row) {
-  if (dropState(row) === 'active') return 'text-text-primary'
+  if (dropState(row) === 'active') {
+    return isFaded(row) ? 'text-text-secondary' : 'text-text-primary'
+  }
   return isPast(row) ? 'text-text-disabled' : 'text-text-secondary'
 }
 
@@ -45,11 +56,18 @@ function hourClass(row) {
  */
 let modalEntryPushed = false
 
+/* 배치할 세션 종류. 환자의 현재 상태를 기본값으로 채워 한 번에 확정할 수 있게 한다 */
+const sessionType = ref(null)
+
 /* PWA standalone에는 뒤로가기가 없으므로 제스처 뒤로가기로 닫히도록 등록한다 */
 watch(
   () => dragState.pending,
   (pending) => {
-    if (!pending || modalEntryPushed) return
+    if (!pending) return
+    sessionType.value = sessionTypes.includes(pending.patient.status)
+      ? pending.patient.status
+      : null
+    if (modalEntryPushed) return
     history.pushState({ modal: 'drop-confirm' }, '')
     modalEntryPushed = true
   },
@@ -75,7 +93,7 @@ function confirmDrop() {
     row.event = {
       id: `ev-${patient.id}-${hour}`,
       title: patient.name,
-      meta: `${patient.condition} · ${patient.status}`,
+      meta: `${patient.condition} · ${sessionType.value}`,
       bar: true,
       badge: null,
     }
@@ -219,10 +237,13 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
           <div
             v-else-if="dropState(row)"
             :data-drop-hour="dropState(row) === 'active' ? row.hour : null"
-            class="flex min-h-11 flex-1 items-center overflow-hidden rounded-lg border"
-            :class="dropState(row) === 'active'
-              ? 'border-dashed border-border-selected bg-selected-bg'
-              : 'border-text-disabled bg-danger-bg'"
+            class="flex min-h-11 flex-1 items-center overflow-hidden rounded-lg border transition-opacity duration-150 ease-standard"
+            :class="[
+              dropState(row) === 'active'
+                ? 'border-dashed border-border-selected bg-selected-bg'
+                : 'border-text-disabled bg-danger-bg',
+              isFaded(row) ? 'opacity-40' : '',
+            ]"
           >
             <span
               class="w-2 shrink-0 self-stretch"
@@ -244,17 +265,42 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
         <div class="w-[360px] rounded-2xl border border-border-default bg-surface-card px-6 py-5">
           <h2 class="text-title-sm font-semibold">이 시간에 배치할까요?</h2>
           <p class="mt-2 text-body text-text-secondary">
-            {{ dragState.pending.hour }} · {{ dragState.pending.patient.name }}
-            ({{ dragState.pending.patient.condition }})
+            {{ day.label }} {{ dragState.pending.hour }} ·
+            {{ dragState.pending.patient.name }} ({{ dragState.pending.patient.condition }})
           </p>
+
+          <p class="mt-4 text-label font-medium text-text-secondary">세션 종류</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button
+              v-for="type in sessionTypes"
+              :key="type"
+              class="flex h-11 items-center"
+              @click="sessionType = type"
+            >
+              <span
+                class="flex h-9 items-center rounded-lg border px-3 text-label"
+                :class="sessionType === type
+                  ? 'border-border-selected bg-selected-bg text-text-primary'
+                  : 'border-border-default text-text-secondary'"
+              >
+                {{ type }}
+              </span>
+            </button>
+          </div>
+
           <div class="mt-5 flex justify-end gap-2">
             <button class="flex h-11 items-center" @click="dismiss">
               <span class="flex h-9 items-center rounded-lg border border-border-default px-3 text-body">
                 취소
               </span>
             </button>
-            <button class="flex h-11 items-center" @click="confirmDrop">
-              <span class="flex h-9 items-center rounded-lg bg-surface-inverse px-3 text-body text-text-inverse">
+            <button class="flex h-11 items-center" :disabled="!sessionType" @click="confirmDrop">
+              <span
+                class="flex h-9 items-center rounded-lg px-3 text-body"
+                :class="sessionType
+                  ? 'bg-surface-inverse text-text-inverse'
+                  : 'bg-surface-field text-text-disabled'"
+              >
                 배치
               </span>
             </button>
