@@ -32,6 +32,8 @@ let pressOrigin = null
 
 function startPress(event, patient) {
   pressOrigin = { x: event.clientX, y: event.clientY }
+  dragState.x = event.clientX
+  dragState.y = event.clientY
   pressTimer = setTimeout(() => {
     dragState.patient = patient
     pressTimer = null
@@ -52,15 +54,35 @@ function cancelPress() {
   pressOrigin = null
 }
 
-function endPress() {
-  cancelPress()
-  dragState.patient = null
+/*
+ * 배치 모드에서는 손가락이 행을 벗어나므로 window에서 추적한다.
+ * 고스트는 pointer-events-none이라 elementFromPoint에 잡히지 않는다.
+ */
+function trackDrag(event) {
+  if (!dragState.patient) return
+  dragState.x = event.clientX
+  dragState.y = event.clientY
+  const under = document.elementFromPoint(event.clientX, event.clientY)
+  dragState.hoverHour = under?.closest('[data-drop-hour]')?.dataset.dropHour ?? null
 }
 
-/* 행 밖에서 손을 떼도 배치 모드가 풀려야 한다 */
-onMounted(() => window.addEventListener('pointerup', endPress))
+/* 드롭 가능한 시간 위에서 손을 뗐을 때만 확인 단계로 넘긴다 */
+function endPress() {
+  cancelPress()
+  if (dragState.patient && dragState.hoverHour) {
+    dragState.pending = { patient: dragState.patient, hour: dragState.hoverHour }
+  }
+  dragState.patient = null
+  dragState.hoverHour = null
+}
+
+onMounted(() => {
+  window.addEventListener('pointerup', endPress)
+  window.addEventListener('pointermove', trackDrag)
+})
 onUnmounted(() => {
   window.removeEventListener('pointerup', endPress)
+  window.removeEventListener('pointermove', trackDrag)
   cancelPress()
 })
 </script>
@@ -206,5 +228,26 @@ onUnmounted(() => {
         </button>
       </section>
     </aside>
+
+    <!-- 집어 든 환자가 손가락을 따라온다. 초안 — Figma 정의 없음 -->
+    <Teleport to="body">
+      <div
+        v-if="dragState.patient"
+        class="pointer-events-none fixed z-50 w-[195px] -translate-y-1/2 opacity-50"
+        :style="{ left: `${dragState.x + 12}px`, top: `${dragState.y}px` }"
+      >
+        <div class="flex items-center gap-2 rounded-lg border border-border-default bg-surface-card py-2 pl-1">
+          <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
+            <User :size="24" />
+          </span>
+          <span class="flex min-w-0 flex-1 flex-col gap-1">
+            <span class="truncate text-title-sm font-semibold"
+              >{{ dragState.patient.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ dragState.patient.age }}·{{ dragState.patient.sex }}</span></span>
+            <span class="truncate text-label font-medium"
+              >{{ dragState.patient.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ dragState.patient.status }}</span></span>
+          </span>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

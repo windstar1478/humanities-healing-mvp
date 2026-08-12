@@ -58,6 +58,9 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
     일정이 이미 있거나 지난 시간이면 전부 여기 해당한다
   - 놓을 수 있음 = 블록 `bg-selected-bg` + `border-border-selected` **점선** + accent 바, 시간 라벨 primary.
     **빈 행에만 존재한다** — 일정이 있는 행은 드롭 대상이 될 수 없다
+    (Figma `time row(filled)`에 drop-active 변형이 없다는 사실이 이 규칙의 근거다)
+  - **놓는 즉시 확정하지 않는다.** 확인 모달을 거친다 — 오토세이브 없음 규칙의 연장
+  - 확인 모달과 드래그 고스트는 **Figma 화면이 없는 초안**이다. 디자인 확정 시 교체할 것
 - **일정 행 명도 2단계**: 지난 일정 = 시간 disabled·제목 secondary / 그 외 = 시간 secondary·제목 primary
   - 메타는 상태와 무관하게 secondary
     (Figma는 지난 일정 메타가 disabled이나 13px 본문 대비가 3.02로 AA 미달이라 격상)
@@ -108,9 +111,9 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 
 완료: 환경 셋업, 토큰 이식, 3분할 셸 + 라우터(5화면 빈 컴포넌트), 좌측 네비 전체,
 홈(업무) 화면 중앙 2컬럼(빠른 저작 · 미배정 · 일정 타임라인), 우측 환자 패널(셸 전역),
-환자 꾹 누르기 → 타임라인 드롭 상태 전환
+환자 꾹 누르기 → 드롭 상태 전환 → 고스트 → 확인 모달 → 배치까지 한 흐름
 
-다음: 드롭 확정(실제 배치) → 코어 프로세스 6단계
+다음: 코어 프로세스 6단계
 
 공유 상태는 `src/dragState.js`의 `reactive()` 객체 하나뿐이다. 늘리기 전에 재검토할 것.
 

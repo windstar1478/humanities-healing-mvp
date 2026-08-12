@@ -1,4 +1,5 @@
 <script setup>
+import { reactive, watch, onMounted, onUnmounted } from 'vue'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next'
 import {
   quickAuthoringItems,
@@ -7,6 +8,9 @@ import {
   scheduleRows,
 } from '../mocks/home.js'
 import { dragState } from '../dragState.js'
+
+/* 배치로 일정이 늘어나므로 목업을 복사해 화면 상태로 들고 있는다 */
+const rows = reactive(scheduleRows.map((row) => ({ ...row })))
 
 /* 지난 일정만 명도를 낮춘다. 진행 중은 accent 배지로 구분한다 */
 const isPast = (row) => row.state === 'past'
@@ -24,6 +28,53 @@ function hourClass(row) {
   if (dropState(row) === 'active') return 'text-text-primary'
   return isPast(row) ? 'text-text-disabled' : 'text-text-secondary'
 }
+
+/* ── 배치 확인 ──────────────────────────────────────────────────
+ * 오토세이브 없음 규칙에 따라 놓는 즉시 확정하지 않고 확인을 받는다.
+ * 이 모달은 Figma에 화면이 없어 초안이다.
+ */
+let modalEntryPushed = false
+
+/* PWA standalone에는 뒤로가기가 없으므로 제스처 뒤로가기로 닫히도록 등록한다 */
+watch(
+  () => dragState.pending,
+  (pending) => {
+    if (!pending || modalEntryPushed) return
+    history.pushState({ modal: 'drop-confirm' }, '')
+    modalEntryPushed = true
+  },
+)
+
+function onPopState() {
+  modalEntryPushed = false
+  dragState.pending = null
+}
+
+function dismiss() {
+  dragState.pending = null
+  if (modalEntryPushed) {
+    modalEntryPushed = false
+    history.back()
+  }
+}
+
+function confirmDrop() {
+  const { patient, hour } = dragState.pending
+  const row = rows.find((r) => r.hour === hour)
+  if (row) {
+    row.event = {
+      id: `ev-${patient.id}-${hour}`,
+      title: patient.name,
+      meta: `${patient.condition} · ${patient.status}`,
+      bar: true,
+      badge: null,
+    }
+  }
+  dismiss()
+}
+
+onMounted(() => window.addEventListener('popstate', onPopState))
+onUnmounted(() => window.removeEventListener('popstate', onPopState))
 </script>
 
 <template>
@@ -99,7 +150,7 @@ function hourClass(row) {
       <!-- 타임라인 -->
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div
-          v-for="row in scheduleRows"
+          v-for="row in rows"
           :key="row.hour"
           class="flex h-13 items-start gap-2 border-t border-border-default py-1 transition-opacity duration-150 ease-standard"
           :class="dropState(row) === 'blocked' ? 'opacity-60' : ''"
@@ -146,6 +197,7 @@ function hourClass(row) {
           <!-- 빈 행은 배치 모드에서만 드롭 타깃으로 그려진다 -->
           <div
             v-else-if="dropState(row)"
+            :data-drop-hour="dropState(row) === 'active' ? row.hour : null"
             class="flex min-h-11 flex-1 items-center overflow-hidden rounded-lg border"
             :class="dropState(row) === 'active'
               ? 'border-dashed border-border-selected bg-selected-bg'
@@ -159,5 +211,35 @@ function hourClass(row) {
         </div>
       </div>
     </section>
+
+    <!-- 배치 확인. Figma 화면이 없는 초안이다 -->
+    <Teleport to="body">
+      <div
+        v-if="dragState.pending"
+        class="fixed inset-0 z-50 flex items-center justify-center p-6"
+        :style="{ backgroundColor: 'var(--scrim)' }"
+        @click.self="dismiss"
+      >
+        <div class="w-[360px] rounded-2xl border border-border-default bg-surface-card px-6 py-5">
+          <h2 class="text-title-sm font-semibold">이 시간에 배치할까요?</h2>
+          <p class="mt-2 text-body text-text-secondary">
+            {{ dragState.pending.hour }} · {{ dragState.pending.patient.name }}
+            ({{ dragState.pending.patient.condition }})
+          </p>
+          <div class="mt-5 flex justify-end gap-2">
+            <button class="flex h-11 items-center" @click="dismiss">
+              <span class="flex h-9 items-center rounded-lg border border-border-default px-3 text-body">
+                취소
+              </span>
+            </button>
+            <button class="flex h-11 items-center" @click="confirmDrop">
+              <span class="flex h-9 items-center rounded-lg bg-interactive-primary-fill px-3 text-body text-text-on-dark-fill">
+                배치
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
