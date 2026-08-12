@@ -22,7 +22,10 @@ export const unassignedTasks = [
 export const scheduleDate = '7월 29일 (수)'
 
 /*
- * state: past | current | upcoming — 시간 라벨·제목·메타의 명도 단계를 결정한다.
+ * state: past | current | upcoming
+ *   - past    : 시간 disabled, 제목 secondary, 바 border-default
+ *   - current : '진행 중' accent 배지로 표시. 나머지는 upcoming과 동일
+ *   - upcoming: 시간 secondary, 제목 primary, 바 border-strong
  * bar: 이벤트 블록 좌측 8px 바의 표시 여부. false여도 자리는 차지한다(투명 처리).
  */
 export const scheduleRows = [
@@ -54,6 +57,3 @@ export const scheduleRows = [
     event: { id: 'ev-6', title: '조민서', meta: '게임과몰입 · 프로그램 처방', bar: true, badge: null },
   },
 ]
-
-/* 14:00 행이 selected/bg + border/selected 토큰을 쓰므로 선택 상태로 확정 */
-export const selectedEventId = 'ev-4'

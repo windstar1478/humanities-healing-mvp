@@ -51,9 +51,12 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
   (셸 패널의 라운드 16과 구분된다)
 - **일정 이벤트 블록**: `bg-surface-container`, 라운드 8, `min-h-44`, 우측 패딩 12
   - 좌측 바는 폭 8로 **항상 렌더**한다. 미표시일 때도 `invisible`로 자리를 유지해 텍스트 정렬을 지킬 것
-  - 바 색: 기본 `border-border-default` / 선택 `border-border-selected`(accent)
-- **일정 행 명도 3단계**: 지난 일정 = 시간 disabled·제목 secondary·메타 disabled /
-  진행 중 = 시간 primary·제목 primary / 예정 = 시간 secondary·제목 primary·메타 secondary
+  - 바 색: 지난 일정 `border-border-default` / 예정·진행 중 `border-border-strong`
+  - **타임라인에 선택 상태 없음.** accent는 '진행 중' 배지와 드롭 대상에만 쓴다
+- **일정 행 명도 2단계**: 지난 일정 = 시간 disabled·제목 secondary / 그 외 = 시간 secondary·제목 primary
+  - 메타는 상태와 무관하게 secondary
+    (Figma는 지난 일정 메타가 disabled이나 13px 본문 대비가 3.02로 AA 미달이라 격상)
+  - **진행 중은 명도가 아니라 accent 배지로 표시**: '진행 중' = `text-interactive-default` + bold
 
 ## 색상 · 타이포그래피
 

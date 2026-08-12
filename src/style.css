@@ -144,7 +144,9 @@
 .dark {
   --color-surface-canvas:       var(--color-neutral-950);
   --color-surface-container:    var(--color-neutral-900);
-  --color-surface-card:         var(--color-neutral-950);
+  /* canvas와 동일한 950이면 카드가 배경에 묻힌다. 라이트(canvas→container→card가
+     점점 밝아짐)와 같은 단조 계층을 유지하려면 card가 container보다 밝아야 한다 */
+  --color-surface-card:         var(--color-neutral-800);
   --color-surface-field:        var(--color-neutral-800);
   --color-surface-card-pressed: var(--color-neutral-900);
   --color-surface-pressed:      var(--color-neutral-800);

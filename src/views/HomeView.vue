@@ -1,21 +1,14 @@
 <script setup>
-import { ref } from 'vue'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next'
 import {
   quickAuthoringItems,
   unassignedTasks,
   scheduleDate,
   scheduleRows,
-  selectedEventId,
 } from '../mocks/home.js'
 
-const selectedId = ref(selectedEventId)
-
-const hourColor = {
-  past: 'text-text-disabled',
-  current: 'text-text-primary',
-  upcoming: 'text-text-secondary',
-}
+/* 지난 일정만 명도를 낮춘다. 진행 중은 accent 배지로 구분한다 */
+const isPast = (row) => row.state === 'past'
 </script>
 
 <template>
@@ -95,39 +88,37 @@ const hourColor = {
           :key="row.hour"
           class="flex h-13 items-start gap-2 border-t border-border-default py-1"
         >
-          <span class="shrink-0 text-caption" :class="hourColor[row.state]">{{ row.hour }}</span>
+          <span
+            class="shrink-0 text-caption"
+            :class="isPast(row) ? 'text-text-disabled' : 'text-text-secondary'"
+          >{{ row.hour }}</span>
 
           <button
             v-if="row.event"
-            class="flex min-h-11 flex-1 items-center gap-3 overflow-hidden rounded-lg pr-3 text-left"
-            :class="row.event.id === selectedId ? 'bg-selected-bg' : 'bg-surface-container'"
-            @click="selectedId = row.event.id"
+            class="flex min-h-11 flex-1 items-center gap-3 overflow-hidden rounded-lg bg-surface-container pr-3 text-left"
           >
             <!-- 바는 항상 자리를 차지한다. 미표시일 때만 투명 처리해 텍스트 정렬을 유지 -->
             <span
               class="w-2 shrink-0 self-stretch"
-              :class="row.event.bar
-                ? (row.event.id === selectedId ? 'bg-border-selected' : 'bg-border-default')
-                : 'invisible'"
+              :class="!row.event.bar
+                ? 'invisible'
+                : (isPast(row) ? 'bg-border-default' : 'bg-border-strong')"
             ></span>
 
             <span class="flex min-w-0 flex-1 flex-col gap-1">
               <span
                 class="truncate text-title-sm font-semibold"
-                :class="row.state === 'past' ? 'text-text-secondary' : 'text-text-primary'"
+                :class="isPast(row) ? 'text-text-secondary' : 'text-text-primary'"
               >
                 {{ row.event.title }}
               </span>
-              <span
-                v-if="row.event.meta"
-                class="truncate text-label font-medium"
-                :class="row.state === 'past' ? 'text-text-disabled' : 'text-text-secondary'"
-              >
+              <!-- 지난 일정 메타도 secondary. Figma는 disabled이지만 13px 본문 대비가 3.02로 낮아 격상 -->
+              <span v-if="row.event.meta" class="truncate text-label font-medium text-text-secondary">
                 {{ row.event.meta }}
               </span>
             </span>
 
-            <span v-if="row.event.badge" class="shrink-0 text-caption text-text-primary">
+            <span v-if="row.event.badge" class="shrink-0 text-caption font-bold text-interactive-default">
               {{ row.event.badge }}
             </span>
           </button>
