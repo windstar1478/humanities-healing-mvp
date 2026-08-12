@@ -19,7 +19,11 @@ export const unassignedTasks = [
   { id: 'task-5', title: '세션활동 저작 초안 작성', category: null, due: null, overdue: false },
 ]
 
-export const scheduleDate = '7월 29일 (수)'
+const SCHEDULE_HOURS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00']
+
+/* 오늘이 아닌 날은 지난 시간이 없으므로 전부 upcoming이다 */
+const emptyDayRows = () =>
+  SCHEDULE_HOURS.map((hour) => ({ hour, state: 'upcoming', event: null }))
 
 /*
  * state: past | current | upcoming
@@ -28,7 +32,7 @@ export const scheduleDate = '7월 29일 (수)'
  *   - upcoming: 시간 secondary, 제목 primary, 바 border-strong
  * bar: 이벤트 블록 좌측 8px 바의 표시 여부. false여도 자리는 차지한다(투명 처리).
  */
-export const scheduleRows = [
+const todayRows = [
   {
     hour: '09:00', state: 'past',
     event: { id: 'ev-1', title: '김서준', meta: '게임과몰입 · 감정평가', bar: true, badge: null },
@@ -56,4 +60,12 @@ export const scheduleRows = [
     hour: '17:00', state: 'upcoming',
     event: { id: 'ev-6', title: '조민서', meta: '게임과몰입 · 프로그램 처방', bar: true, badge: null },
   },
+]
+
+/* 7/29만 일정이 차 있고 나머지는 비어 있다. 날짜 이동은 이 범위 안에서만 */
+export const scheduleDays = [
+  { label: '7월 29일 (수)', isToday: true, rows: todayRows },
+  { label: '7월 30일 (목)', isToday: false, rows: emptyDayRows() },
+  { label: '7월 31일 (금)', isToday: false, rows: emptyDayRows() },
+  { label: '8월 1일 (토)', isToday: false, rows: emptyDayRows() },
 ]

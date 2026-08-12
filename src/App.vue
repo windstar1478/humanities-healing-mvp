@@ -66,22 +66,39 @@ function trackDrag(event) {
   dragState.hoverHour = under?.closest('[data-drop-hour]')?.dataset.dropHour ?? null
 }
 
-/* 드롭 가능한 시간 위에서 손을 뗐을 때만 확인 단계로 넘긴다 */
-function endPress() {
+function hourUnder(x, y) {
+  const under = document.elementFromPoint(x, y)
+  return under?.closest('[data-drop-hour]')?.dataset.dropHour ?? null
+}
+
+/* 손을 뗀 좌표로 다시 판정한다. 직전 hover 값을 그대로 쓰면 안 된다 */
+function endPress(event) {
   cancelPress()
-  if (dragState.patient && dragState.hoverHour) {
-    dragState.pending = { patient: dragState.patient, hour: dragState.hoverHour }
+  if (dragState.patient) {
+    const hour = Number.isFinite(event?.clientX)
+      ? hourUnder(event.clientX, event.clientY)
+      : dragState.hoverHour
+    if (hour) dragState.pending = { patient: dragState.patient, hour }
   }
+  dragState.patient = null
+  dragState.hoverHour = null
+}
+
+/* 취소는 배치하지 않고 빠져나온다 */
+function cancelDrag() {
+  cancelPress()
   dragState.patient = null
   dragState.hoverHour = null
 }
 
 onMounted(() => {
   window.addEventListener('pointerup', endPress)
+  window.addEventListener('pointercancel', cancelDrag)
   window.addEventListener('pointermove', trackDrag)
 })
 onUnmounted(() => {
   window.removeEventListener('pointerup', endPress)
+  window.removeEventListener('pointercancel', cancelDrag)
   window.removeEventListener('pointermove', trackDrag)
   cancelPress()
 })
@@ -178,7 +195,7 @@ onUnmounted(() => {
           :class="dragState.patient?.id === p.id ? 'bg-surface-pressed' : ''"
           @pointerdown="startPress($event, p)"
           @pointermove="trackPress"
-          @pointercancel="endPress"
+          @pointercancel="cancelDrag"
           @contextmenu.prevent
         >
           <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
@@ -213,7 +230,7 @@ onUnmounted(() => {
           :class="dragState.patient?.id === p.id ? 'bg-surface-pressed' : ''"
           @pointerdown="startPress($event, p)"
           @pointermove="trackPress"
-          @pointercancel="endPress"
+          @pointercancel="cancelDrag"
           @contextmenu.prevent
         >
           <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">

@@ -1,16 +1,26 @@
 <script setup>
-import { reactive, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next'
 import {
   quickAuthoringItems,
   unassignedTasks,
-  scheduleDate,
-  scheduleRows,
+  scheduleDays,
 } from '../mocks/home.js'
 import { dragState } from '../dragState.js'
 
 /* 배치로 일정이 늘어나므로 목업을 복사해 화면 상태로 들고 있는다 */
-const rows = reactive(scheduleRows.map((row) => ({ ...row })))
+const days = reactive(
+  scheduleDays.map((day) => ({ ...day, rows: day.rows.map((row) => ({ ...row })) })),
+)
+
+const dayIndex = ref(0)
+const day = computed(() => days[dayIndex.value])
+const rows = computed(() => day.value.rows)
+
+function goDay(step) {
+  const next = dayIndex.value + step
+  if (next >= 0 && next < days.length) dayIndex.value = next
+}
 
 /* 지난 일정만 명도를 낮춘다. 진행 중은 accent 배지로 구분한다 */
 const isPast = (row) => row.state === 'past'
@@ -60,7 +70,7 @@ function dismiss() {
 
 function confirmDrop() {
   const { patient, hour } = dragState.pending
-  const row = rows.find((r) => r.hour === hour)
+  const row = rows.value.find((r) => r.hour === hour)
   if (row) {
     row.event = {
       id: `ev-${patient.id}-${hour}`,
@@ -129,18 +139,29 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
     <section class="flex min-h-0 flex-1 flex-col rounded-lg border border-border-default bg-surface-card px-3 py-2">
       <!-- 날짜 네비게이션 -->
       <div class="flex h-12 shrink-0 items-center justify-center gap-2">
-        <button class="flex size-11 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed">
+        <button
+          class="flex size-11 items-center justify-center rounded-lg active:bg-surface-pressed"
+          :class="dayIndex === 0 ? 'text-text-disabled' : 'text-text-secondary'"
+          :disabled="dayIndex === 0"
+          @click="goDay(-1)"
+        >
           <ChevronLeft :size="24" />
         </button>
-        <span class="text-title-sm font-semibold">{{ scheduleDate }}</span>
-        <button class="flex size-11 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed">
+        <span class="text-title-sm font-semibold">{{ day.label }}</span>
+        <button
+          class="flex size-11 items-center justify-center rounded-lg active:bg-surface-pressed"
+          :class="dayIndex === days.length - 1 ? 'text-text-disabled' : 'text-text-secondary'"
+          :disabled="dayIndex === days.length - 1"
+          @click="goDay(1)"
+        >
           <ChevronRight :size="24" />
         </button>
       </div>
 
       <!-- 오늘 / 일정 추가 -->
       <div class="flex h-11 shrink-0 items-center justify-between">
-        <span class="text-label font-medium text-text-secondary">오늘</span>
+        <span v-if="day.isToday" class="text-label font-medium text-text-secondary">오늘</span>
+        <span v-else></span>
         <button class="flex h-11 items-center gap-1 pl-2 text-label font-medium text-text-secondary active:text-text-primary">
           <Plus :size="16" class="shrink-0" />
           <span>일정 추가</span>
@@ -233,7 +254,7 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
               </span>
             </button>
             <button class="flex h-11 items-center" @click="confirmDrop">
-              <span class="flex h-9 items-center rounded-lg bg-interactive-primary-fill px-3 text-body text-text-on-dark-fill">
+              <span class="flex h-9 items-center rounded-lg bg-surface-inverse px-3 text-body text-text-inverse">
                 배치
               </span>
             </button>

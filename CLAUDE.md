@@ -61,6 +61,8 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
     (Figma `time row(filled)`에 drop-active 변형이 없다는 사실이 이 규칙의 근거다)
   - **놓는 즉시 확정하지 않는다.** 확인 모달을 거친다 — 오토세이브 없음 규칙의 연장
   - 확인 모달과 드래그 고스트는 **Figma 화면이 없는 초안**이다. 디자인 확정 시 교체할 것
+  - 확인·확정 버튼은 `bg-surface-inverse` + `text-text-inverse`.
+    라이트에서 검정, 다크에서 흰색으로 자동 반전된다 (`interactive-primary-fill` 아님)
 - **일정 행 명도 2단계**: 지난 일정 = 시간 disabled·제목 secondary / 그 외 = 시간 secondary·제목 primary
   - 메타는 상태와 무관하게 secondary
     (Figma는 지난 일정 메타가 disabled이나 13px 본문 대비가 3.02로 AA 미달이라 격상)
