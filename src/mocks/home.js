@@ -29,14 +29,12 @@ const emptyDayRows = () =>
 const pastDayRows = () =>
   SCHEDULE_HOURS.map((hour) => ({ hour, state: 'past', event: null }))
 
-/* 확인 모달의 세션 종류 선택지 — 기존 환자 상태값에서 뽑은 잠정 목록. 확인 필요 */
-export const sessionTypes = [
-  '감정평가 (사전)',
-  '감정평가 (사후)',
-  '프로그램 처방',
-  '프로그램 수행',
-  '프로세스 종료',
-]
+/*
+ * 배치 유형. 치유 프로세스는 단계를 고르는 게 아니라 환자의 nextStep을 따른다.
+ * 아직 도달하지 않은 단계에 접근하지 못하게 하려는 구조라 선택지가 아니다.
+ */
+export const GENERAL = '일반 상담'
+export const PROCESS = '치유 프로세스'
 
 /*
  * state: past | current | upcoming
@@ -106,6 +104,7 @@ export const scheduleDays = [
     label: '7월 31일 (금)', isToday: false,
     rows: withEvents(emptyDayRows(), [
       { hour: '10:00', id: 'ev-0731-1', title: '월말 결산', meta: null, bar: false },
+      { hour: '14:00', id: 'ev-0731-3', title: '정유나', meta: 'PTSD · 프로그램 수행', bar: true },
       { hour: '15:00', id: 'ev-0731-2', title: '조민서', meta: '게임과몰입 · 프로그램 처방', bar: true },
     ]),
   },

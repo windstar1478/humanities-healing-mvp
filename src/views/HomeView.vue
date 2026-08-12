@@ -5,9 +5,10 @@ import {
   quickAuthoringItems,
   unassignedTasks,
   scheduleDays,
-  sessionTypes,
+  GENERAL,
+  PROCESS,
 } from '../mocks/home.js'
-import { dragState } from '../dragState.js'
+import { dragState, startPress, trackPress, cancelDrag } from '../dragState.js'
 
 /* 배치로 일정이 늘어나므로 목업을 복사해 화면 상태로 들고 있는다 */
 const days = reactive(
@@ -31,7 +32,7 @@ const isPast = (row) => row.state === 'past'
  * 일정이 이미 있거나 지난 시간이면 놓을 수 없다.
  */
 function dropState(row) {
-  if (!dragState.patient) return null
+  if (!dragState.item) return null
   return row.event || isPast(row) ? 'blocked' : 'active'
 }
 
@@ -56,17 +57,22 @@ function hourClass(row) {
  */
 let modalEntryPushed = false
 
-/* 배치할 세션 종류. 환자의 현재 상태를 기본값으로 채워 한 번에 확정할 수 있게 한다 */
-const sessionType = ref(null)
+/* 일반 상담인지 치유 프로세스인지. 단계 자체는 고르지 않는다 */
+const visitType = ref(PROCESS)
+
+/* 다음 단계가 없으면 치유 프로세스로 배치할 수 없다 */
+const nextStep = computed(() => dragState.pending?.item?.nextStep ?? null)
+const canConfirm = computed(() => {
+  if (dragState.pending?.itemKind !== 'patient') return true
+  return visitType.value === GENERAL || Boolean(nextStep.value)
+})
 
 /* PWA standalone에는 뒤로가기가 없으므로 제스처 뒤로가기로 닫히도록 등록한다 */
 watch(
   () => dragState.pending,
   (pending) => {
     if (!pending) return
-    sessionType.value = sessionTypes.includes(pending.patient.status)
-      ? pending.patient.status
-      : null
+    visitType.value = pending.item?.nextStep ? PROCESS : GENERAL
     if (modalEntryPushed) return
     history.pushState({ modal: 'drop-confirm' }, '')
     modalEntryPushed = true
@@ -86,17 +92,30 @@ function dismiss() {
   }
 }
 
+/*
+ * 일정은 환자의 현재 상태를 참조하지 않고 그때 무엇을 했는지를 자기 데이터로 갖는다.
+ * 그래서 같은 환자라도 날짜마다 다른 단계를 가질 수 있다.
+ */
 function confirmDrop() {
-  const { patient, hour } = dragState.pending
+  const { item, itemKind, hour } = dragState.pending
   const row = rows.value.find((r) => r.hour === hour)
   if (row) {
-    row.event = {
-      id: `ev-${patient.id}-${hour}`,
-      title: patient.name,
-      meta: `${patient.condition} · ${sessionType.value}`,
-      bar: true,
-      badge: null,
-    }
+    row.event =
+      itemKind === 'patient'
+        ? {
+            id: `ev-${item.id}-${day.value.label}-${hour}`,
+            title: item.name,
+            meta: `${item.condition} · ${visitType.value === PROCESS ? nextStep.value : GENERAL}`,
+            bar: true,
+            badge: null,
+          }
+        : {
+            id: `ev-${item.id}-${day.value.label}-${hour}`,
+            title: item.title,
+            meta: item.category,
+            bar: false,
+            badge: null,
+          }
   }
   dismiss()
 }
@@ -140,7 +159,14 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
             :key="task.id"
             class="flex h-13 shrink-0 flex-col justify-center border-t border-border-default"
           >
-            <button class="flex h-12 w-full flex-col justify-center gap-0.5 rounded-lg p-2 text-left active:bg-surface-card-pressed">
+            <button
+              class="flex h-12 w-full touch-manipulation select-none flex-col justify-center gap-0.5 rounded-lg p-2 text-left transition-colors duration-100 ease-standard active:bg-surface-card-pressed"
+              :class="dragState.item?.id === task.id ? 'bg-surface-card-pressed' : ''"
+              @pointerdown="startPress($event, task, 'task')"
+              @pointermove="trackPress"
+              @pointercancel="cancelDrag"
+              @contextmenu.prevent
+            >
               <span class="truncate text-body text-text-primary">{{ task.title }}</span>
               <span v-if="task.category || task.due" class="truncate text-caption text-text-secondary">
                 <template v-if="task.category">{{ task.category }}</template>
@@ -233,21 +259,24 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
             </span>
           </button>
 
-          <!-- 빈 행은 배치 모드에서만 드롭 타깃으로 그려진다 -->
+          <!--
+            빈 행의 블록은 항상 렌더한다. v-if로 새로 붙이면 전환 없이 즉시 나타나
+            일정이 있는 행(색 전환 150ms)보다 빨라 보인다
+          -->
           <div
-            v-else-if="dropState(row)"
+            v-else
             :data-drop-hour="dropState(row) === 'active' ? row.hour : null"
-            class="flex min-h-11 flex-1 items-center overflow-hidden rounded-lg border transition-opacity duration-150 ease-standard"
+            class="flex min-h-11 flex-1 items-center overflow-hidden rounded-lg border transition duration-150 ease-standard"
             :class="[
-              dropState(row) === 'active'
-                ? 'border-dashed border-border-selected bg-selected-bg'
-                : 'border-text-disabled bg-danger-bg',
+              dropState(row) === 'active' ? 'border-dashed border-border-selected bg-selected-bg' : '',
+              dropState(row) === 'blocked' ? 'border-text-disabled bg-danger-bg' : '',
+              !dropState(row) ? 'border-transparent' : '',
               isFaded(row) ? 'opacity-40' : '',
             ]"
           >
             <span
-              class="w-2 shrink-0 self-stretch"
-              :class="dropState(row) === 'active' ? 'bg-border-selected' : 'invisible'"
+              class="w-2 shrink-0 self-stretch transition duration-150 ease-standard"
+              :class="dropState(row) === 'active' ? 'bg-border-selected' : 'bg-transparent'"
             ></span>
           </div>
         </div>
@@ -266,27 +295,42 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
           <h2 class="text-title-sm font-semibold">이 시간에 배치할까요?</h2>
           <p class="mt-2 text-body text-text-secondary">
             {{ day.label }} {{ dragState.pending.hour }} ·
-            {{ dragState.pending.patient.name }} ({{ dragState.pending.patient.condition }})
+            <template v-if="dragState.pending.itemKind === 'patient'">
+              {{ dragState.pending.item.name }} ({{ dragState.pending.item.condition }})
+            </template>
+            <template v-else>{{ dragState.pending.item.title }}</template>
           </p>
 
-          <p class="mt-4 text-label font-medium text-text-secondary">세션 종류</p>
-          <div class="mt-2 flex flex-wrap gap-2">
-            <button
-              v-for="type in sessionTypes"
-              :key="type"
-              class="flex h-11 items-center"
-              @click="sessionType = type"
-            >
-              <span
-                class="flex h-9 items-center rounded-lg border px-3 text-label"
-                :class="sessionType === type
-                  ? 'border-border-selected bg-selected-bg text-text-primary'
-                  : 'border-border-default text-text-secondary'"
+          <!-- 환자만 유형을 고른다. 할 일은 그대로 배치된다 -->
+          <template v-if="dragState.pending.itemKind === 'patient'">
+            <p class="mt-4 text-label font-medium text-text-secondary">유형</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button
+                v-for="type in [PROCESS, GENERAL]"
+                :key="type"
+                class="flex h-11 items-center"
+                @click="visitType = type"
               >
-                {{ type }}
-              </span>
-            </button>
-          </div>
+                <span
+                  class="flex h-9 items-center rounded-lg border px-3 text-label"
+                  :class="visitType === type
+                    ? 'border-border-selected bg-selected-bg text-text-primary'
+                    : 'border-border-default text-text-secondary'"
+                >
+                  {{ type }}
+                </span>
+              </button>
+            </div>
+
+            <!--
+              단계는 고르는 게 아니라 환자 데이터가 정한다.
+              아직 도달하지 않은 단계에 접근하지 못하게 하기 위함이다.
+            -->
+            <p v-if="visitType === PROCESS" class="mt-3 text-label text-text-secondary">
+              <template v-if="nextStep">다음 단계 · <span class="font-medium text-text-primary">{{ nextStep }}</span></template>
+              <template v-else>남은 프로세스 단계가 없습니다</template>
+            </p>
+          </template>
 
           <div class="mt-5 flex justify-end gap-2">
             <button class="flex h-11 items-center" @click="dismiss">
@@ -294,10 +338,10 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
                 취소
               </span>
             </button>
-            <button class="flex h-11 items-center" :disabled="!sessionType" @click="confirmDrop">
+            <button class="flex h-11 items-center" :disabled="!canConfirm" @click="confirmDrop">
               <span
                 class="flex h-9 items-center rounded-lg px-3 text-body"
-                :class="sessionType
+                :class="canConfirm
                   ? 'bg-surface-inverse text-text-inverse'
                   : 'bg-surface-field text-text-disabled'"
               >

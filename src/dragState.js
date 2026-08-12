@@ -1,18 +1,21 @@
 import { reactive } from 'vue'
 
 /*
- * 셸(우측 환자 패널)과 화면(중앙 일정 타임라인)이 함께 읽는 유일한 공유 상태.
+ * 셸(우측 환자 패널)과 화면(미배정 목록 · 일정 타임라인)이 함께 쓰는 공유 상태.
  * 규모가 이 정도라 Pinia 대신 reactive 객체 하나로 시작한다.
+ * 꾹 누르기 로직도 여기 두어 환자와 할 일이 같은 문법을 쓰게 한다.
  */
 export const dragState = reactive({
-  /* 꾹 눌러 집어 든 환자. null이면 배치 모드가 아니다 */
-  patient: null,
+  /* 집어 든 대상. null이면 배치 모드가 아니다 */
+  item: null,
+  /* 'patient' | 'task' */
+  itemKind: null,
   /* 고스트가 따라갈 포인터 좌표 */
   x: 0,
   y: 0,
   /* 손가락 아래에 있는 드롭 가능한 시간. 없으면 null */
   hoverHour: null,
-  /* 손을 뗀 뒤 확인 대기 중인 배치. { patient, hour } */
+  /* 손을 뗀 뒤 확인 대기 중인 배치. { item, itemKind, hour } */
   pending: null,
 })
 
@@ -21,3 +24,72 @@ export const LONG_PRESS_MS = 500
 
 /* 이 거리를 넘겨 움직이면 스크롤 의도로 보고 꾹 누르기를 취소한다 */
 export const PRESS_MOVE_TOLERANCE = 10
+
+let pressTimer = null
+let pressOrigin = null
+
+function clearPress() {
+  if (pressTimer) clearTimeout(pressTimer)
+  pressTimer = null
+  pressOrigin = null
+}
+
+function resetDrag() {
+  dragState.item = null
+  dragState.itemKind = null
+  dragState.hoverHour = null
+}
+
+function hourUnder(x, y) {
+  return document.elementFromPoint(x, y)?.closest('[data-drop-hour]')?.dataset.dropHour ?? null
+}
+
+export function startPress(event, item, kind) {
+  pressOrigin = { x: event.clientX, y: event.clientY }
+  dragState.x = event.clientX
+  dragState.y = event.clientY
+  pressTimer = setTimeout(() => {
+    dragState.item = item
+    dragState.itemKind = kind
+    pressTimer = null
+  }, LONG_PRESS_MS)
+}
+
+/* 임계 시간 전에 손가락이 움직이면 스크롤 의도이므로 넘겨준다 */
+export function trackPress(event) {
+  if (!pressTimer || !pressOrigin) return
+  const dx = event.clientX - pressOrigin.x
+  const dy = event.clientY - pressOrigin.y
+  if (Math.hypot(dx, dy) > PRESS_MOVE_TOLERANCE) clearPress()
+}
+
+/*
+ * 배치 모드에서는 손가락이 행을 벗어나므로 window에서 추적한다.
+ * 고스트는 pointer-events-none이라 elementFromPoint를 방해하지 않는다.
+ */
+export function trackDrag(event) {
+  if (!dragState.item) return
+  dragState.x = event.clientX
+  dragState.y = event.clientY
+  dragState.hoverHour = hourUnder(event.clientX, event.clientY)
+}
+
+/* 손을 뗀 좌표로 다시 판정한다. 직전 hover 값을 그대로 쓰면 안 된다 */
+export function endPress(event) {
+  clearPress()
+  if (dragState.item) {
+    const hour = Number.isFinite(event?.clientX)
+      ? hourUnder(event.clientX, event.clientY)
+      : dragState.hoverHour
+    if (hour) {
+      dragState.pending = { item: dragState.item, itemKind: dragState.itemKind, hour }
+    }
+  }
+  resetDrag()
+}
+
+/* 취소는 배치하지 않고 빠져나온다 */
+export function cancelDrag() {
+  clearPress()
+  resetDrag()
+}

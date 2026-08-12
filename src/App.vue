@@ -6,7 +6,9 @@ import {
   Search, User, ChevronRight, ArrowUpDown,
 } from 'lucide-vue-next'
 import { recentPatients, allPatients } from './mocks/patients.js'
-import { dragState, LONG_PRESS_MS, PRESS_MOVE_TOLERANCE } from './dragState.js'
+import {
+  dragState, startPress, trackPress, trackDrag, endPress, cancelDrag,
+} from './dragState.js'
 
 const navGroups = [
   [
@@ -26,71 +28,7 @@ function setTheme(dark) {
   document.documentElement.classList.toggle('dark', dark)
 }
 
-/* ── 환자 꾹 누르기 → 일정 배치 모드 ────────────────────────────── */
-let pressTimer = null
-let pressOrigin = null
-
-function startPress(event, patient) {
-  pressOrigin = { x: event.clientX, y: event.clientY }
-  dragState.x = event.clientX
-  dragState.y = event.clientY
-  pressTimer = setTimeout(() => {
-    dragState.patient = patient
-    pressTimer = null
-  }, LONG_PRESS_MS)
-}
-
-/* 임계 시간 전에 손가락이 움직이면 스크롤 의도이므로 넘겨준다 */
-function trackPress(event) {
-  if (!pressTimer || !pressOrigin) return
-  const dx = event.clientX - pressOrigin.x
-  const dy = event.clientY - pressOrigin.y
-  if (Math.hypot(dx, dy) > PRESS_MOVE_TOLERANCE) cancelPress()
-}
-
-function cancelPress() {
-  if (pressTimer) clearTimeout(pressTimer)
-  pressTimer = null
-  pressOrigin = null
-}
-
-/*
- * 배치 모드에서는 손가락이 행을 벗어나므로 window에서 추적한다.
- * 고스트는 pointer-events-none이라 elementFromPoint에 잡히지 않는다.
- */
-function trackDrag(event) {
-  if (!dragState.patient) return
-  dragState.x = event.clientX
-  dragState.y = event.clientY
-  const under = document.elementFromPoint(event.clientX, event.clientY)
-  dragState.hoverHour = under?.closest('[data-drop-hour]')?.dataset.dropHour ?? null
-}
-
-function hourUnder(x, y) {
-  const under = document.elementFromPoint(x, y)
-  return under?.closest('[data-drop-hour]')?.dataset.dropHour ?? null
-}
-
-/* 손을 뗀 좌표로 다시 판정한다. 직전 hover 값을 그대로 쓰면 안 된다 */
-function endPress(event) {
-  cancelPress()
-  if (dragState.patient) {
-    const hour = Number.isFinite(event?.clientX)
-      ? hourUnder(event.clientX, event.clientY)
-      : dragState.hoverHour
-    if (hour) dragState.pending = { patient: dragState.patient, hour }
-  }
-  dragState.patient = null
-  dragState.hoverHour = null
-}
-
-/* 취소는 배치하지 않고 빠져나온다 */
-function cancelDrag() {
-  cancelPress()
-  dragState.patient = null
-  dragState.hoverHour = null
-}
-
+/* 꾹 누르기 로직은 dragState에 있다. 셸에서 window 리스너만 한 번 건다 */
 onMounted(() => {
   window.addEventListener('pointerup', endPress)
   window.addEventListener('pointercancel', cancelDrag)
@@ -100,7 +38,7 @@ onUnmounted(() => {
   window.removeEventListener('pointerup', endPress)
   window.removeEventListener('pointercancel', cancelDrag)
   window.removeEventListener('pointermove', trackDrag)
-  cancelPress()
+  cancelDrag()
 })
 </script>
 
@@ -192,8 +130,8 @@ onUnmounted(() => {
           v-for="p in recentPatients"
           :key="p.id"
           class="flex touch-manipulation select-none items-center gap-2 rounded-lg py-2 pl-1 text-left transition-colors duration-100 ease-standard active:bg-surface-pressed"
-          :class="dragState.patient?.id === p.id ? 'bg-surface-pressed' : ''"
-          @pointerdown="startPress($event, p)"
+          :class="dragState.item?.id === p.id ? 'bg-surface-pressed' : ''"
+          @pointerdown="startPress($event, p, 'patient')"
           @pointermove="trackPress"
           @pointercancel="cancelDrag"
           @contextmenu.prevent
@@ -227,8 +165,8 @@ onUnmounted(() => {
           v-for="p in allPatients"
           :key="p.id"
           class="flex touch-manipulation select-none items-center gap-2 rounded-lg py-2 pl-1 text-left transition-colors duration-100 ease-standard active:bg-surface-pressed"
-          :class="dragState.patient?.id === p.id ? 'bg-surface-pressed' : ''"
-          @pointerdown="startPress($event, p)"
+          :class="dragState.item?.id === p.id ? 'bg-surface-pressed' : ''"
+          @pointerdown="startPress($event, p, 'patient')"
           @pointermove="trackPress"
           @pointercancel="cancelDrag"
           @contextmenu.prevent
@@ -246,22 +184,30 @@ onUnmounted(() => {
       </section>
     </aside>
 
-    <!-- 집어 든 환자가 손가락을 따라온다. 초안 — Figma 정의 없음 -->
+    <!-- 집어 든 대상이 손가락을 따라온다. 초안 — Figma 정의 없음 -->
     <Teleport to="body">
       <div
-        v-if="dragState.patient"
+        v-if="dragState.item"
         class="pointer-events-none fixed z-50 w-[195px] -translate-y-1/2 opacity-50"
         :style="{ left: `${dragState.x + 12}px`, top: `${dragState.y}px` }"
       >
         <div class="flex items-center gap-2 rounded-lg border border-border-default bg-surface-card py-2 pl-1">
-          <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
-            <User :size="24" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-1">
-            <span class="truncate text-title-sm font-semibold"
-              >{{ dragState.patient.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ dragState.patient.age }}·{{ dragState.patient.sex }}</span></span>
-            <span class="truncate text-label font-medium"
-              >{{ dragState.patient.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ dragState.patient.status }}</span></span>
+          <template v-if="dragState.itemKind === 'patient'">
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
+              <User :size="24" />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col gap-1">
+              <span class="truncate text-title-sm font-semibold"
+                >{{ dragState.item.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ dragState.item.age }}·{{ dragState.item.sex }}</span></span>
+              <span class="truncate text-label font-medium"
+                >{{ dragState.item.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ dragState.item.status }}</span></span>
+            </span>
+          </template>
+          <span v-else class="flex min-w-0 flex-1 flex-col gap-0.5 px-2">
+            <span class="truncate text-body">{{ dragState.item.title }}</span>
+            <span v-if="dragState.item.category" class="truncate text-caption text-text-secondary">
+              {{ dragState.item.category }}
+            </span>
           </span>
         </div>
       </div>
