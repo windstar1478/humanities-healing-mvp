@@ -53,6 +53,11 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
   - 좌측 바는 폭 8로 **항상 렌더**한다. 미표시일 때도 `invisible`로 자리를 유지해 텍스트 정렬을 지킬 것
   - 바 색: 지난 일정 `border-border-default` / 예정·진행 중 `border-border-strong`
   - **타임라인에 선택 상태 없음.** accent는 '진행 중' 배지와 드롭 대상에만 쓴다
+- **드롭 상태** (환자를 꾹 눌러 배치하는 동안):
+  - 놓을 수 없음 = 행 `opacity-60` + 블록 `bg-danger-bg` + `border-text-disabled`(실선).
+    일정이 이미 있거나 지난 시간이면 전부 여기 해당한다
+  - 놓을 수 있음 = 블록 `bg-selected-bg` + `border-border-selected` **점선** + accent 바, 시간 라벨 primary.
+    **빈 행에만 존재한다** — 일정이 있는 행은 드롭 대상이 될 수 없다
 - **일정 행 명도 2단계**: 지난 일정 = 시간 disabled·제목 secondary / 그 외 = 시간 secondary·제목 primary
   - 메타는 상태와 무관하게 secondary
     (Figma는 지난 일정 메타가 disabled이나 13px 본문 대비가 3.02로 AA 미달이라 격상)
@@ -76,6 +81,16 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 
 폰트: Pretendard Variable / 아이콘: Lucide outline
 
+## 모션 (잠정 — Figma 프로토타입 미정의)
+
+아래 값은 **Figma 근거가 없는 잠정 합의**다. 프로토타입이 나오면 교체할 것.
+
+- easing은 `ease-standard` 하나로 통일 (`cubic-bezier(0.2, 0, 0, 1)`)
+- duration은 Tailwind 기본 스케일을 그대로 쓴다:
+  `duration-100` 상태 피드백 / `duration-150` 드롭 타깃 · 명도 전환 / `duration-200` 위치 이동
+- 꾹 누르기 임계 500ms, 이동 허용 오차 10px — `src/dragState.js`의 상수로 관리
+- **화면 코드에 임의 duration을 쓰지 말 것.** 위 3단계로 흡수하거나 여기에 추가
+
 ## 셸 확정 치수
 
 외곽 패딩 24 / 패널 간격 24 / 좌측 네비 137 / 우측 패널 274 / 중앙 flex-1
@@ -92,9 +107,12 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 ## 현재 상태
 
 완료: 환경 셋업, 토큰 이식, 3분할 셸 + 라우터(5화면 빈 컴포넌트), 좌측 네비 전체,
-홈(업무) 화면 중앙 2컬럼(빠른 저작 · 미배정 · 일정 타임라인), 우측 환자 패널(셸 전역)
+홈(업무) 화면 중앙 2컬럼(빠른 저작 · 미배정 · 일정 타임라인), 우측 환자 패널(셸 전역),
+환자 꾹 누르기 → 타임라인 드롭 상태 전환
 
-다음: 코어 프로세스 6단계
+다음: 드롭 확정(실제 배치) → 코어 프로세스 6단계
+
+공유 상태는 `src/dragState.js`의 `reactive()` 객체 하나뿐이다. 늘리기 전에 재검토할 것.
 
 미해결:
 - 실기기 논리 해상도 실측 (기기 미수령). Figma 프레임 1138×712도 추정값

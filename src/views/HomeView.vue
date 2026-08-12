@@ -6,9 +6,24 @@ import {
   scheduleDate,
   scheduleRows,
 } from '../mocks/home.js'
+import { dragState } from '../dragState.js'
 
 /* 지난 일정만 명도를 낮춘다. 진행 중은 accent 배지로 구분한다 */
 const isPast = (row) => row.state === 'past'
+
+/*
+ * 환자를 집어 든 동안에만 드롭 상태를 계산한다.
+ * 일정이 이미 있거나 지난 시간이면 놓을 수 없다.
+ */
+function dropState(row) {
+  if (!dragState.patient) return null
+  return row.event || isPast(row) ? 'blocked' : 'active'
+}
+
+function hourClass(row) {
+  if (dropState(row) === 'active') return 'text-text-primary'
+  return isPast(row) ? 'text-text-disabled' : 'text-text-secondary'
+}
 </script>
 
 <template>
@@ -86,29 +101,34 @@ const isPast = (row) => row.state === 'past'
         <div
           v-for="row in scheduleRows"
           :key="row.hour"
-          class="flex h-13 items-start gap-2 border-t border-border-default py-1"
+          class="flex h-13 items-start gap-2 border-t border-border-default py-1 transition-opacity duration-150 ease-standard"
+          :class="dropState(row) === 'blocked' ? 'opacity-60' : ''"
         >
-          <span
-            class="shrink-0 text-caption"
-            :class="isPast(row) ? 'text-text-disabled' : 'text-text-secondary'"
-          >{{ row.hour }}</span>
+          <span class="shrink-0 text-caption" :class="hourClass(row)">{{ row.hour }}</span>
 
           <button
             v-if="row.event"
-            class="flex min-h-11 flex-1 items-center gap-3 overflow-hidden rounded-lg bg-surface-container pr-3 text-left"
+            class="flex min-h-11 flex-1 items-center gap-3 overflow-hidden rounded-lg border pr-3 text-left transition-colors duration-150 ease-standard"
+            :class="dropState(row) === 'blocked'
+              ? 'border-text-disabled bg-danger-bg'
+              : 'border-transparent bg-surface-container'"
           >
             <!-- 바는 항상 자리를 차지한다. 미표시일 때만 투명 처리해 텍스트 정렬을 유지 -->
             <span
               class="w-2 shrink-0 self-stretch"
               :class="!row.event.bar
                 ? 'invisible'
-                : (isPast(row) ? 'bg-border-default' : 'bg-border-strong')"
+                : (isPast(row) || dropState(row) === 'blocked'
+                  ? 'bg-border-default'
+                  : 'bg-border-strong')"
             ></span>
 
             <span class="flex min-w-0 flex-1 flex-col gap-1">
               <span
                 class="truncate text-title-sm font-semibold"
-                :class="isPast(row) ? 'text-text-secondary' : 'text-text-primary'"
+                :class="isPast(row) || dropState(row) === 'blocked'
+                  ? 'text-text-secondary'
+                  : 'text-text-primary'"
               >
                 {{ row.event.title }}
               </span>
@@ -122,6 +142,20 @@ const isPast = (row) => row.state === 'past'
               {{ row.event.badge }}
             </span>
           </button>
+
+          <!-- 빈 행은 배치 모드에서만 드롭 타깃으로 그려진다 -->
+          <div
+            v-else-if="dropState(row)"
+            class="flex min-h-11 flex-1 items-center overflow-hidden rounded-lg border"
+            :class="dropState(row) === 'active'
+              ? 'border-dashed border-border-selected bg-selected-bg'
+              : 'border-text-disabled bg-danger-bg'"
+          >
+            <span
+              class="w-2 shrink-0 self-stretch"
+              :class="dropState(row) === 'active' ? 'bg-border-selected' : 'invisible'"
+            ></span>
+          </div>
         </div>
       </div>
     </section>

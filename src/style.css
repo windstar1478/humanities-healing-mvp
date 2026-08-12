@@ -5,6 +5,10 @@
    Figma color/* 와 1:1 대응. 화면 코드에서 직접 사용 금지.
    ============================================ */
 @theme {
+/* motion — 값의 근거는 Figma가 아니라 잠정 합의다. 프로토타입 정의되면 교체할 것
+   duration은 Tailwind 기본 스케일을 그대로 쓴다: 100=상태 피드백 / 150=드롭 타깃 / 200=위치 이동 */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
 /* typography */
   --font-sans: "Pretendard Variable", system-ui, sans-serif;
 
@@ -38,6 +42,8 @@
   --color-neutral-500: #8A909C;
   --color-neutral-700: #4A4F58;
   --color-neutral-800: #2D3139;
+  /* 850은 다크 카드 전용. 950↔800 구간의 50% 지점 */
+  --color-neutral-850: #1F2229;
   --color-neutral-900: #1B1E24;
   --color-neutral-950: #111318;
 
@@ -145,8 +151,9 @@
   --color-surface-canvas:       var(--color-neutral-950);
   --color-surface-container:    var(--color-neutral-900);
   /* canvas와 동일한 950이면 카드가 배경에 묻힌다. 라이트(canvas→container→card가
-     점점 밝아짐)와 같은 단조 계층을 유지하려면 card가 container보다 밝아야 한다 */
-  --color-surface-card:         var(--color-neutral-800);
+     점점 밝아짐)와 같은 단조 계층을 유지하려면 card가 container보다 밝아야 한다.
+     800은 상승폭이 과해서 950↔800의 50% 지점인 850을 쓴다 */
+  --color-surface-card:         var(--color-neutral-850);
   --color-surface-field:        var(--color-neutral-800);
   --color-surface-card-pressed: var(--color-neutral-900);
   --color-surface-pressed:      var(--color-neutral-800);

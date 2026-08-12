@@ -1,11 +1,12 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import {
   ClipboardList, CalendarDays, Users, TrendingUp, PenTool,
   Bell, Settings, Sun, Moon,
   Search, User, ChevronRight, ArrowUpDown,
 } from 'lucide-vue-next'
 import { recentPatients, allPatients } from './mocks/patients.js'
+import { dragState, LONG_PRESS_MS, PRESS_MOVE_TOLERANCE } from './dragState.js'
 
 const navGroups = [
   [
@@ -24,6 +25,44 @@ function setTheme(dark) {
   isDark.value = dark
   document.documentElement.classList.toggle('dark', dark)
 }
+
+/* ── 환자 꾹 누르기 → 일정 배치 모드 ────────────────────────────── */
+let pressTimer = null
+let pressOrigin = null
+
+function startPress(event, patient) {
+  pressOrigin = { x: event.clientX, y: event.clientY }
+  pressTimer = setTimeout(() => {
+    dragState.patient = patient
+    pressTimer = null
+  }, LONG_PRESS_MS)
+}
+
+/* 임계 시간 전에 손가락이 움직이면 스크롤 의도이므로 넘겨준다 */
+function trackPress(event) {
+  if (!pressTimer || !pressOrigin) return
+  const dx = event.clientX - pressOrigin.x
+  const dy = event.clientY - pressOrigin.y
+  if (Math.hypot(dx, dy) > PRESS_MOVE_TOLERANCE) cancelPress()
+}
+
+function cancelPress() {
+  if (pressTimer) clearTimeout(pressTimer)
+  pressTimer = null
+  pressOrigin = null
+}
+
+function endPress() {
+  cancelPress()
+  dragState.patient = null
+}
+
+/* 행 밖에서 손을 떼도 배치 모드가 풀려야 한다 */
+onMounted(() => window.addEventListener('pointerup', endPress))
+onUnmounted(() => {
+  window.removeEventListener('pointerup', endPress)
+  cancelPress()
+})
 </script>
 
 <template>
@@ -113,7 +152,12 @@ function setTheme(dark) {
         <button
           v-for="p in recentPatients"
           :key="p.id"
-          class="flex items-center gap-2 rounded-lg py-2 pl-1 text-left active:bg-surface-pressed"
+          class="flex touch-manipulation select-none items-center gap-2 rounded-lg py-2 pl-1 text-left transition-colors duration-100 ease-standard active:bg-surface-pressed"
+          :class="dragState.patient?.id === p.id ? 'bg-surface-pressed' : ''"
+          @pointerdown="startPress($event, p)"
+          @pointermove="trackPress"
+          @pointercancel="endPress"
+          @contextmenu.prevent
         >
           <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
             <User :size="24" />
@@ -143,7 +187,12 @@ function setTheme(dark) {
         <button
           v-for="p in allPatients"
           :key="p.id"
-          class="flex items-center gap-2 rounded-lg py-2 pl-1 text-left active:bg-surface-pressed"
+          class="flex touch-manipulation select-none items-center gap-2 rounded-lg py-2 pl-1 text-left transition-colors duration-100 ease-standard active:bg-surface-pressed"
+          :class="dragState.patient?.id === p.id ? 'bg-surface-pressed' : ''"
+          @pointerdown="startPress($event, p)"
+          @pointermove="trackPress"
+          @pointercancel="endPress"
+          @contextmenu.prevent
         >
           <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
             <User :size="24" />
