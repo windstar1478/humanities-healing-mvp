@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, reactive, watch, onMounted, onUnmounted } from 'vue'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-vue-next'
 import {
   quickAuthoringItems,
   unassignedTasks,
@@ -67,8 +67,17 @@ let modalEntryPushed = false
 
 /* 'drop' | 'add-event' | 'add-task' */
 const modal = ref(null)
-/* subjectKind: 'patient' | 'work' — 환자면 목록에서 고르고, 업무면 제목을 쓴다 */
-const form = reactive({ subjectKind: 'patient', patient: null, title: '', category: '', hour: null })
+/* subjectKind: 'patient' | 'work' — 환자면 검색해서 고르고, 업무면 제목을 쓴다 */
+const form = reactive({
+  subjectKind: 'patient', patient: null, query: '', title: '', category: '', hour: null,
+})
+
+/* 검색어가 없으면 최근 환자를 먼저 보여준다 */
+const patientResults = computed(() => {
+  const q = form.query.trim()
+  if (!q) return recentPatients
+  return patientOptions.filter((p) => p.name.includes(q) || p.condition.includes(q))
+})
 
 /* 중복 배치 경고. 확인하고 나면 그대로 진행한다 */
 const duplicate = ref(null)
@@ -125,6 +134,7 @@ function openAdd(kind) {
   duplicate.value = null
   form.subjectKind = 'patient'
   form.patient = null
+  form.query = ''
   form.title = ''
   form.category = ''
   form.hour = openHours.value[0] ?? null
@@ -422,7 +432,9 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
         :style="{ backgroundColor: 'var(--scrim)' }"
         @click.self="dismiss"
       >
-        <div class="w-[360px] rounded-2xl border border-border-default bg-surface-card px-6 py-5">
+        <!-- 내용이 길어져도 화면을 넘기지 않는다. 본문만 스크롤하고 버튼은 고정 -->
+        <div class="flex max-h-full w-[360px] flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card">
+          <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <!-- 중복 경고. 확인을 거치면 원래 흐름으로 돌아간다 -->
           <template v-if="duplicate">
             <h2 class="text-title-sm font-semibold">이미 배치된 대상입니다</h2>
@@ -472,17 +484,34 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
 
               <template v-if="form.subjectKind === 'patient'">
                 <p class="mt-4 text-label font-medium text-text-secondary">환자</p>
-                <div class="mt-2 max-h-40 overflow-y-auto rounded-lg border border-border-default">
+                <!-- 검색이 기본. 비어 있으면 최근 환자를 먼저 보여준다 -->
+                <div class="mt-2 flex h-11 items-center gap-4 rounded-lg border border-border-default bg-surface-field px-3">
+                  <Search :size="20" class="shrink-0 text-text-disabled" />
+                  <input
+                    v-model="form.query"
+                    type="text"
+                    placeholder="환자 검색"
+                    class="min-w-0 flex-1 bg-transparent text-body text-text-primary placeholder:text-text-disabled"
+                  />
+                </div>
+                <!-- 리스트는 컨테이너 하나로 묶고 행은 구분선으로만 나눈다 -->
+                <div class="mt-2 max-h-36 overflow-y-auto rounded-lg border border-border-default">
                   <button
-                    v-for="p in patientOptions"
+                    v-for="(p, i) in patientResults"
                     :key="p.id"
                     class="flex h-12 w-full items-center justify-between gap-2 px-3 text-left"
-                    :class="form.patient?.name === p.name ? 'bg-selected-bg' : ''"
+                    :class="[
+                      i > 0 ? 'border-t border-border-subtle' : '',
+                      form.patient?.name === p.name ? 'bg-selected-bg' : '',
+                    ]"
                     @click="pickPatient(p)"
                   >
                     <span class="truncate text-body">{{ p.name }}</span>
                     <span class="shrink-0 text-caption text-text-secondary">{{ p.condition }}</span>
                   </button>
+                  <p v-if="!patientResults.length" class="px-3 py-3 text-label text-text-secondary">
+                    검색 결과가 없습니다
+                  </p>
                 </div>
               </template>
             </template>
@@ -540,11 +569,12 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
             <!-- 미배정 할 일은 시간을 갖지 않으므로 일정 추가에만 시간 선택이 있다 -->
             <template v-if="modal === 'add-event'">
               <p class="mt-4 text-label font-medium text-text-secondary">시간</p>
-              <div v-if="openHours.length" class="mt-2 flex flex-wrap gap-2">
+              <!-- 9칸이 줄바꿈되면 모달이 화면을 넘긴다. 가로 스크롤로 한 줄에 둔다 -->
+              <div v-if="openHours.length" class="-mx-6 mt-2 flex gap-2 overflow-x-auto px-6">
                 <button
                   v-for="hour in openHours"
                   :key="hour"
-                  class="flex h-11 items-center"
+                  class="flex h-11 shrink-0 items-center"
                   @click="form.hour = hour"
                 >
                   <span
@@ -561,7 +591,9 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
             </template>
           </template>
 
-          <div class="mt-5 flex justify-end gap-2">
+          </div>
+
+          <div class="flex shrink-0 justify-end gap-2 border-t border-border-subtle px-6 py-3">
             <button class="flex h-11 items-center" @click="dismiss">
               <span class="flex h-9 items-center rounded-lg border border-border-default px-3 text-body">
                 취소
