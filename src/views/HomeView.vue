@@ -10,10 +10,11 @@ import {
 } from '../mocks/home.js'
 import { dragState, startPress, trackPress, cancelDrag } from '../dragState.js'
 
-/* 배치로 일정이 늘어나므로 목업을 복사해 화면 상태로 들고 있는다 */
+/* 배치·추가로 목록이 늘어나므로 목업을 복사해 화면 상태로 들고 있는다 */
 const days = reactive(
   scheduleDays.map((day) => ({ ...day, rows: day.rows.map((row) => ({ ...row })) })),
 )
+const tasks = reactive(unassignedTasks.map((task) => ({ ...task })))
 
 const dayIndex = ref(Math.max(0, days.findIndex((d) => d.isToday)))
 const day = computed(() => days[dayIndex.value])
@@ -51,45 +52,92 @@ function hourClass(row) {
   return isPast(row) ? 'text-text-disabled' : 'text-text-secondary'
 }
 
-/* ── 배치 확인 ──────────────────────────────────────────────────
- * 오토세이브 없음 규칙에 따라 놓는 즉시 확정하지 않고 확인을 받는다.
- * 이 모달은 Figma에 화면이 없어 초안이다.
+/* ── 모달 ────────────────────────────────────────────────────────
+ * 배치 확인 · 일정 추가 · 할 일 추가가 같은 셸을 쓴다.
+ * 오토세이브 없음 규칙에 따라 어느 쪽도 즉시 확정하지 않는다.
+ * Figma에 화면이 없는 초안이다.
  */
 let modalEntryPushed = false
+
+/* 'drop' | 'add-event' | 'add-task' */
+const modal = ref(null)
+const form = reactive({ title: '', category: '', hour: null })
+
+/* 중복 배치 경고. 확인하고 나면 그대로 진행한다 */
+const duplicate = ref(null)
 
 /* 일반 상담인지 치유 프로세스인지. 단계 자체는 고르지 않는다 */
 const visitType = ref(PROCESS)
 
-/* 다음 단계가 없으면 치유 프로세스로 배치할 수 없다 */
+/* 비어 있고 지나지 않은 시간만 고를 수 있다 — 드롭 규칙과 동일 */
+const openHours = computed(() =>
+  rows.value.filter((r) => !r.event && !isPast(r)).map((r) => r.hour),
+)
+
 const nextStep = computed(() => dragState.pending?.item?.nextStep ?? null)
+
 const canConfirm = computed(() => {
+  if (modal.value === 'add-task') return form.title.trim().length > 0
+  if (modal.value === 'add-event') return form.title.trim().length > 0 && Boolean(form.hour)
   if (dragState.pending?.itemKind !== 'patient') return true
   return visitType.value === GENERAL || Boolean(nextStep.value)
 })
 
 /* PWA standalone에는 뒤로가기가 없으므로 제스처 뒤로가기로 닫히도록 등록한다 */
+function pushEntry() {
+  if (modalEntryPushed) return
+  history.pushState({ modal: modal.value }, '')
+  modalEntryPushed = true
+}
+
+function openAdd(kind) {
+  modal.value = kind
+  duplicate.value = null
+  form.title = ''
+  form.category = ''
+  form.hour = openHours.value[0] ?? null
+  pushEntry()
+}
+
 watch(
   () => dragState.pending,
   (pending) => {
     if (!pending) return
+    modal.value = 'drop'
+    duplicate.value = null
     visitType.value = pending.item?.nextStep ? PROCESS : GENERAL
-    if (modalEntryPushed) return
-    history.pushState({ modal: 'drop-confirm' }, '')
-    modalEntryPushed = true
+    pushEntry()
   },
 )
 
-function onPopState() {
-  modalEntryPushed = false
+function closeModal() {
+  modal.value = null
+  duplicate.value = null
   dragState.pending = null
 }
 
+function onPopState() {
+  modalEntryPushed = false
+  closeModal()
+}
+
 function dismiss() {
-  dragState.pending = null
+  closeModal()
   if (modalEntryPushed) {
     modalEntryPushed = false
     history.back()
   }
+}
+
+/* 같은 날 같은 대상이 이미 배치되어 있는지 */
+function findDuplicate(name) {
+  return rows.value.find((r) => r.event?.title === name) ?? null
+}
+
+function place(hour, event) {
+  const row = rows.value.find((r) => r.hour === hour)
+  if (row) row.event = event
+  dismiss()
 }
 
 /*
@@ -98,26 +146,58 @@ function dismiss() {
  */
 function confirmDrop() {
   const { item, itemKind, hour } = dragState.pending
-  const row = rows.value.find((r) => r.hour === hour)
-  if (row) {
-    row.event =
-      itemKind === 'patient'
-        ? {
-            id: `ev-${item.id}-${day.value.label}-${hour}`,
-            title: item.name,
-            meta: `${item.condition} · ${visitType.value === PROCESS ? nextStep.value : GENERAL}`,
-            bar: true,
-            badge: null,
-          }
-        : {
-            id: `ev-${item.id}-${day.value.label}-${hour}`,
-            title: item.title,
-            meta: item.category,
-            bar: false,
-            badge: null,
-          }
+  const name = itemKind === 'patient' ? item.name : item.title
+  if (!duplicate.value) {
+    const found = findDuplicate(name)
+    if (found) {
+      duplicate.value = found
+      return
+    }
   }
+  place(hour, {
+    id: `ev-${item.id}-${day.value.label}-${hour}`,
+    title: name,
+    meta: itemKind === 'patient'
+      ? `${item.condition} · ${visitType.value === PROCESS ? nextStep.value : GENERAL}`
+      : item.category,
+    bar: itemKind === 'patient',
+    badge: null,
+  })
+}
+
+function confirmAddEvent() {
+  const name = form.title.trim()
+  if (!duplicate.value) {
+    const found = findDuplicate(name)
+    if (found) {
+      duplicate.value = found
+      return
+    }
+  }
+  place(form.hour, {
+    id: `ev-new-${day.value.label}-${form.hour}`,
+    title: name,
+    meta: form.category.trim() || null,
+    bar: false,
+    badge: null,
+  })
+}
+
+function confirmAddTask() {
+  tasks.push({
+    id: `task-${Date.now()}`,
+    title: form.title.trim(),
+    category: form.category.trim() || null,
+    due: null,
+    overdue: false,
+  })
   dismiss()
+}
+
+function confirm() {
+  if (modal.value === 'add-task') return confirmAddTask()
+  if (modal.value === 'add-event') return confirmAddEvent()
+  return confirmDrop()
 }
 
 onMounted(() => window.addEventListener('popstate', onPopState))
@@ -146,8 +226,11 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
       <!-- 미배정 -->
       <section class="flex min-h-0 flex-1 flex-col rounded-lg border border-border-default bg-surface-card px-3 py-2">
         <div class="flex h-11 shrink-0 items-center justify-between">
-          <h2 class="text-title-sm font-semibold">미배정 · {{ unassignedTasks.length }}</h2>
-          <button class="flex h-11 items-center gap-1 pl-2 text-label font-medium text-text-secondary active:text-text-primary">
+          <h2 class="text-title-sm font-semibold">미배정 · {{ tasks.length }}</h2>
+          <button
+            class="flex h-11 items-center gap-1 pl-2 text-label font-medium text-text-secondary active:text-text-primary"
+            @click="openAdd('add-task')"
+          >
             <Plus :size="16" class="shrink-0" />
             <span>할 일 추가</span>
           </button>
@@ -155,7 +238,7 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
 
         <ul class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
           <li
-            v-for="task in unassignedTasks"
+            v-for="task in tasks"
             :key="task.id"
             class="flex h-13 shrink-0 flex-col justify-center border-t border-border-default"
           >
@@ -206,7 +289,10 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
       <div class="flex h-11 shrink-0 items-center justify-between">
         <span v-if="day.isToday" class="text-label font-medium text-text-secondary">오늘</span>
         <span v-else></span>
-        <button class="flex h-11 items-center gap-1 pl-2 text-label font-medium text-text-secondary active:text-text-primary">
+        <button
+          class="flex h-11 items-center gap-1 pl-2 text-label font-medium text-text-secondary active:text-text-primary"
+          @click="openAdd('add-event')"
+        >
           <Plus :size="16" class="shrink-0" />
           <span>일정 추가</span>
         </button>
@@ -283,53 +369,117 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
       </div>
     </section>
 
-    <!-- 배치 확인. Figma 화면이 없는 초안이다 -->
+    <!--
+      배치 확인 · 일정 추가 · 할 일 추가가 같은 셸을 쓴다.
+      Figma 화면이 없는 초안이다.
+    -->
     <Teleport to="body">
       <div
-        v-if="dragState.pending"
+        v-if="modal"
         class="fixed inset-0 z-50 flex items-center justify-center p-6"
         :style="{ backgroundColor: 'var(--scrim)' }"
         @click.self="dismiss"
       >
         <div class="w-[360px] rounded-2xl border border-border-default bg-surface-card px-6 py-5">
-          <h2 class="text-title-sm font-semibold">이 시간에 배치할까요?</h2>
-          <p class="mt-2 text-body text-text-secondary">
-            {{ day.label }} {{ dragState.pending.hour }} ·
-            <template v-if="dragState.pending.itemKind === 'patient'">
-              {{ dragState.pending.item.name }} ({{ dragState.pending.item.condition }})
-            </template>
-            <template v-else>{{ dragState.pending.item.title }}</template>
-          </p>
-
-          <!-- 환자만 유형을 고른다. 할 일은 그대로 배치된다 -->
-          <template v-if="dragState.pending.itemKind === 'patient'">
-            <p class="mt-4 text-label font-medium text-text-secondary">유형</p>
-            <div class="mt-2 flex flex-wrap gap-2">
-              <button
-                v-for="type in [PROCESS, GENERAL]"
-                :key="type"
-                class="flex h-11 items-center"
-                @click="visitType = type"
-              >
-                <span
-                  class="flex h-9 items-center rounded-lg border px-3 text-label"
-                  :class="visitType === type
-                    ? 'border-border-selected bg-selected-bg text-text-primary'
-                    : 'border-border-default text-text-secondary'"
-                >
-                  {{ type }}
-                </span>
-              </button>
-            </div>
-
-            <!--
-              단계는 고르는 게 아니라 환자 데이터가 정한다.
-              아직 도달하지 않은 단계에 접근하지 못하게 하기 위함이다.
-            -->
-            <p v-if="visitType === PROCESS" class="mt-3 text-label text-text-secondary">
-              <template v-if="nextStep">다음 단계 · <span class="font-medium text-text-primary">{{ nextStep }}</span></template>
-              <template v-else>남은 프로세스 단계가 없습니다</template>
+          <!-- 중복 경고. 확인을 거치면 원래 흐름으로 돌아간다 -->
+          <template v-if="duplicate">
+            <h2 class="text-title-sm font-semibold">이미 배치된 대상입니다</h2>
+            <p class="mt-2 text-body text-text-secondary">
+              {{ day.label }} {{ duplicate.hour }}에 <span class="text-text-primary">{{ duplicate.event.title }}</span> 일정이
+              이미 있습니다. 그래도 배치할까요?
             </p>
+          </template>
+
+          <template v-else>
+            <h2 class="text-title-sm font-semibold">
+              {{ modal === 'add-task' ? '할 일 추가' : modal === 'add-event' ? '일정 추가' : '이 시간에 배치할까요?' }}
+            </h2>
+
+            <!-- 배치 확인 -->
+            <template v-if="modal === 'drop'">
+              <p class="mt-2 text-body text-text-secondary">
+                {{ day.label }} {{ dragState.pending.hour }} ·
+                <template v-if="dragState.pending.itemKind === 'patient'">
+                  {{ dragState.pending.item.name }} ({{ dragState.pending.item.condition }})
+                </template>
+                <template v-else>{{ dragState.pending.item.title }}</template>
+              </p>
+
+              <!-- 환자만 유형을 고른다. 할 일은 그대로 배치된다 -->
+              <template v-if="dragState.pending.itemKind === 'patient'">
+                <p class="mt-4 text-label font-medium text-text-secondary">유형</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button
+                    v-for="type in [PROCESS, GENERAL]"
+                    :key="type"
+                    class="flex h-11 items-center"
+                    @click="visitType = type"
+                  >
+                    <span
+                      class="flex h-9 items-center rounded-lg border px-3 text-label"
+                      :class="visitType === type
+                        ? 'border-border-selected bg-selected-bg text-text-primary'
+                        : 'border-border-default text-text-secondary'"
+                    >
+                      {{ type }}
+                    </span>
+                  </button>
+                </div>
+
+                <!--
+                  단계는 고르는 게 아니라 환자 데이터가 정한다.
+                  아직 도달하지 않은 단계에 접근하지 못하게 하기 위함이다.
+                -->
+                <p v-if="visitType === PROCESS" class="mt-3 text-label text-text-secondary">
+                  <template v-if="nextStep">다음 단계 · <span class="font-medium text-text-primary">{{ nextStep }}</span></template>
+                  <template v-else>남은 프로세스 단계가 없습니다</template>
+                </p>
+              </template>
+            </template>
+
+            <!-- 일정 추가 / 할 일 추가 -->
+            <template v-else>
+              <p class="mt-4 text-label font-medium text-text-secondary">제목</p>
+              <input
+                v-model="form.title"
+                type="text"
+                :placeholder="modal === 'add-task' ? '할 일 이름' : '일정 이름'"
+                class="mt-2 h-11 w-full rounded-lg border border-border-default bg-surface-field px-3 text-body text-text-primary placeholder:text-text-disabled"
+              />
+
+              <p class="mt-4 text-label font-medium text-text-secondary">
+                {{ modal === 'add-task' ? '분류' : '분류 (선택)' }}
+              </p>
+              <input
+                v-model="form.category"
+                type="text"
+                placeholder="협업 · 보고 · 저작도구 등"
+                class="mt-2 h-11 w-full rounded-lg border border-border-default bg-surface-field px-3 text-body text-text-primary placeholder:text-text-disabled"
+              />
+
+              <!-- 미배정 할 일은 시간을 갖지 않으므로 일정 추가에만 시간 선택이 있다 -->
+              <template v-if="modal === 'add-event'">
+                <p class="mt-4 text-label font-medium text-text-secondary">시간</p>
+                <div v-if="openHours.length" class="mt-2 flex flex-wrap gap-2">
+                  <button
+                    v-for="hour in openHours"
+                    :key="hour"
+                    class="flex h-11 items-center"
+                    @click="form.hour = hour"
+                  >
+                    <span
+                      class="flex h-9 items-center rounded-lg border px-3 text-label"
+                      :class="form.hour === hour
+                        ? 'border-border-selected bg-selected-bg text-text-primary'
+                        : 'border-border-default text-text-secondary'"
+                    >
+                      {{ hour }}
+                    </span>
+                  </button>
+                </div>
+                <p v-else class="mt-2 text-label text-text-secondary">비어 있는 시간이 없습니다</p>
+              </template>
+            </template>
           </template>
 
           <div class="mt-5 flex justify-end gap-2">
@@ -338,14 +488,14 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
                 취소
               </span>
             </button>
-            <button class="flex h-11 items-center" :disabled="!canConfirm" @click="confirmDrop">
+            <button class="flex h-11 items-center" :disabled="!canConfirm" @click="confirm">
               <span
                 class="flex h-9 items-center rounded-lg px-3 text-body"
                 :class="canConfirm
                   ? 'bg-surface-inverse text-text-inverse'
                   : 'bg-surface-field text-text-disabled'"
               >
-                배치
+                {{ duplicate ? '그래도 배치' : modal === 'add-task' ? '추가' : '배치' }}
               </span>
             </button>
           </div>
