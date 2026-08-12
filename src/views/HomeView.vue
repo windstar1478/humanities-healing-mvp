@@ -8,7 +8,13 @@ import {
   GENERAL,
   PROCESS,
 } from '../mocks/home.js'
+import { recentPatients, allPatients } from '../mocks/patients.js'
 import { dragState, startPress, trackPress, cancelDrag } from '../dragState.js'
+
+/* 신규 환자 등록은 이 화면의 일이 아니다. 기존 환자 중에서만 고른다 */
+const patientOptions = [...recentPatients, ...allPatients].filter(
+  (p, i, arr) => arr.findIndex((q) => q.name === p.name) === i,
+)
 
 /* 배치·추가로 목록이 늘어나므로 목업을 복사해 화면 상태로 들고 있는다 */
 const days = reactive(
@@ -61,7 +67,8 @@ let modalEntryPushed = false
 
 /* 'drop' | 'add-event' | 'add-task' */
 const modal = ref(null)
-const form = reactive({ title: '', category: '', hour: null })
+/* subjectKind: 'patient' | 'work' — 환자면 목록에서 고르고, 업무면 제목을 쓴다 */
+const form = reactive({ subjectKind: 'patient', patient: null, title: '', category: '', hour: null })
 
 /* 중복 배치 경고. 확인하고 나면 그대로 진행한다 */
 const duplicate = ref(null)
@@ -74,13 +81,36 @@ const openHours = computed(() =>
   rows.value.filter((r) => !r.event && !isPast(r)).map((r) => r.hour),
 )
 
-const nextStep = computed(() => dragState.pending?.item?.nextStep ?? null)
+/*
+ * 지금 다루는 대상이 환자인지. 드롭이든 일정 추가든 환자라면 같은 규칙을 탄다 —
+ * 유형을 고르고, 치유 프로세스면 단계는 nextStep을 따른다.
+ */
+const activePatient = computed(() => {
+  if (modal.value === 'drop') {
+    return dragState.pending?.itemKind === 'patient' ? dragState.pending.item : null
+  }
+  if (modal.value === 'add-event') {
+    return form.subjectKind === 'patient' ? form.patient : null
+  }
+  return null
+})
+
+const nextStep = computed(() => activePatient.value?.nextStep ?? null)
+
+/* 환자 일정은 유형 규칙을 통과해야 확정할 수 있다 */
+const patientRuleOk = computed(
+  () => visitType.value === GENERAL || Boolean(nextStep.value),
+)
 
 const canConfirm = computed(() => {
   if (modal.value === 'add-task') return form.title.trim().length > 0
-  if (modal.value === 'add-event') return form.title.trim().length > 0 && Boolean(form.hour)
-  if (dragState.pending?.itemKind !== 'patient') return true
-  return visitType.value === GENERAL || Boolean(nextStep.value)
+  if (modal.value === 'add-event') {
+    if (!form.hour) return false
+    return form.subjectKind === 'patient'
+      ? Boolean(form.patient) && patientRuleOk.value
+      : form.title.trim().length > 0
+  }
+  return activePatient.value ? patientRuleOk.value : true
 })
 
 /* PWA standalone에는 뒤로가기가 없으므로 제스처 뒤로가기로 닫히도록 등록한다 */
@@ -93,10 +123,19 @@ function pushEntry() {
 function openAdd(kind) {
   modal.value = kind
   duplicate.value = null
+  form.subjectKind = 'patient'
+  form.patient = null
   form.title = ''
   form.category = ''
   form.hour = openHours.value[0] ?? null
+  visitType.value = PROCESS
   pushEntry()
+}
+
+/* 환자를 바꾸면 그 환자의 nextStep 유무에 맞춰 유형을 다시 잡는다 */
+function pickPatient(patient) {
+  form.patient = patient
+  visitType.value = patient.nextStep ? PROCESS : GENERAL
 }
 
 watch(
@@ -166,7 +205,8 @@ function confirmDrop() {
 }
 
 function confirmAddEvent() {
-  const name = form.title.trim()
+  const patient = activePatient.value
+  const name = patient ? patient.name : form.title.trim()
   if (!duplicate.value) {
     const found = findDuplicate(name)
     if (found) {
@@ -177,8 +217,10 @@ function confirmAddEvent() {
   place(form.hour, {
     id: `ev-new-${day.value.label}-${form.hour}`,
     title: name,
-    meta: form.category.trim() || null,
-    bar: false,
+    meta: patient
+      ? `${patient.condition} · ${visitType.value === PROCESS ? nextStep.value : GENERAL}`
+      : form.category.trim() || null,
+    bar: Boolean(patient),
     badge: null,
   })
 }
@@ -396,49 +438,57 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
             </h2>
 
             <!-- 배치 확인 -->
-            <template v-if="modal === 'drop'">
-              <p class="mt-2 text-body text-text-secondary">
-                {{ day.label }} {{ dragState.pending.hour }} ·
-                <template v-if="dragState.pending.itemKind === 'patient'">
-                  {{ dragState.pending.item.name }} ({{ dragState.pending.item.condition }})
-                </template>
-                <template v-else>{{ dragState.pending.item.title }}</template>
-              </p>
-
-              <!-- 환자만 유형을 고른다. 할 일은 그대로 배치된다 -->
+            <p v-if="modal === 'drop'" class="mt-2 text-body text-text-secondary">
+              {{ day.label }} {{ dragState.pending.hour }} ·
               <template v-if="dragState.pending.itemKind === 'patient'">
-                <p class="mt-4 text-label font-medium text-text-secondary">유형</p>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <button
-                    v-for="type in [PROCESS, GENERAL]"
-                    :key="type"
-                    class="flex h-11 items-center"
-                    @click="visitType = type"
+                {{ dragState.pending.item.name }} ({{ dragState.pending.item.condition }})
+              </template>
+              <template v-else>{{ dragState.pending.item.title }}</template>
+            </p>
+
+            <!--
+              일정 추가는 대상 종류를 먼저 정한다. 환자면 목록에서 고르게 해서
+              제목 자유 입력으로 프로세스 규칙을 우회하지 못하게 한다.
+            -->
+            <template v-if="modal === 'add-event'">
+              <p class="mt-4 text-label font-medium text-text-secondary">대상</p>
+              <div class="mt-2 flex gap-2">
+                <button
+                  v-for="opt in [{ k: 'patient', label: '환자' }, { k: 'work', label: '업무' }]"
+                  :key="opt.k"
+                  class="flex h-11 items-center"
+                  @click="form.subjectKind = opt.k"
+                >
+                  <span
+                    class="flex h-9 items-center rounded-lg border px-3 text-label"
+                    :class="form.subjectKind === opt.k
+                      ? 'border-border-selected bg-selected-bg text-text-primary'
+                      : 'border-border-default text-text-secondary'"
                   >
-                    <span
-                      class="flex h-9 items-center rounded-lg border px-3 text-label"
-                      :class="visitType === type
-                        ? 'border-border-selected bg-selected-bg text-text-primary'
-                        : 'border-border-default text-text-secondary'"
-                    >
-                      {{ type }}
-                    </span>
+                    {{ opt.label }}
+                  </span>
+                </button>
+              </div>
+
+              <template v-if="form.subjectKind === 'patient'">
+                <p class="mt-4 text-label font-medium text-text-secondary">환자</p>
+                <div class="mt-2 max-h-40 overflow-y-auto rounded-lg border border-border-default">
+                  <button
+                    v-for="p in patientOptions"
+                    :key="p.id"
+                    class="flex h-12 w-full items-center justify-between gap-2 px-3 text-left"
+                    :class="form.patient?.name === p.name ? 'bg-selected-bg' : ''"
+                    @click="pickPatient(p)"
+                  >
+                    <span class="truncate text-body">{{ p.name }}</span>
+                    <span class="shrink-0 text-caption text-text-secondary">{{ p.condition }}</span>
                   </button>
                 </div>
-
-                <!--
-                  단계는 고르는 게 아니라 환자 데이터가 정한다.
-                  아직 도달하지 않은 단계에 접근하지 못하게 하기 위함이다.
-                -->
-                <p v-if="visitType === PROCESS" class="mt-3 text-label text-text-secondary">
-                  <template v-if="nextStep">다음 단계 · <span class="font-medium text-text-primary">{{ nextStep }}</span></template>
-                  <template v-else>남은 프로세스 단계가 없습니다</template>
-                </p>
               </template>
             </template>
 
-            <!-- 일정 추가 / 할 일 추가 -->
-            <template v-else>
+            <!-- 업무 일정 · 할 일은 제목을 직접 쓴다 -->
+            <template v-if="modal === 'add-task' || (modal === 'add-event' && form.subjectKind === 'work')">
               <p class="mt-4 text-label font-medium text-text-secondary">제목</p>
               <input
                 v-model="form.title"
@@ -447,38 +497,67 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState))
                 class="mt-2 h-11 w-full rounded-lg border border-border-default bg-surface-field px-3 text-body text-text-primary placeholder:text-text-disabled"
               />
 
-              <p class="mt-4 text-label font-medium text-text-secondary">
-                {{ modal === 'add-task' ? '분류' : '분류 (선택)' }}
-              </p>
+              <p class="mt-4 text-label font-medium text-text-secondary">분류 (선택)</p>
               <input
                 v-model="form.category"
                 type="text"
                 placeholder="협업 · 보고 · 저작도구 등"
                 class="mt-2 h-11 w-full rounded-lg border border-border-default bg-surface-field px-3 text-body text-text-primary placeholder:text-text-disabled"
               />
+            </template>
 
-              <!-- 미배정 할 일은 시간을 갖지 않으므로 일정 추가에만 시간 선택이 있다 -->
-              <template v-if="modal === 'add-event'">
-                <p class="mt-4 text-label font-medium text-text-secondary">시간</p>
-                <div v-if="openHours.length" class="mt-2 flex flex-wrap gap-2">
-                  <button
-                    v-for="hour in openHours"
-                    :key="hour"
-                    class="flex h-11 items-center"
-                    @click="form.hour = hour"
+            <!-- 환자 일정은 드롭이든 추가든 같은 규칙을 탄다 -->
+            <template v-if="activePatient">
+              <p class="mt-4 text-label font-medium text-text-secondary">유형</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  v-for="type in [PROCESS, GENERAL]"
+                  :key="type"
+                  class="flex h-11 items-center"
+                  @click="visitType = type"
+                >
+                  <span
+                    class="flex h-9 items-center rounded-lg border px-3 text-label"
+                    :class="visitType === type
+                      ? 'border-border-selected bg-selected-bg text-text-primary'
+                      : 'border-border-default text-text-secondary'"
                   >
-                    <span
-                      class="flex h-9 items-center rounded-lg border px-3 text-label"
-                      :class="form.hour === hour
-                        ? 'border-border-selected bg-selected-bg text-text-primary'
-                        : 'border-border-default text-text-secondary'"
-                    >
-                      {{ hour }}
-                    </span>
-                  </button>
-                </div>
-                <p v-else class="mt-2 text-label text-text-secondary">비어 있는 시간이 없습니다</p>
-              </template>
+                    {{ type }}
+                  </span>
+                </button>
+              </div>
+
+              <!--
+                단계는 고르는 게 아니라 환자 데이터가 정한다.
+                아직 도달하지 않은 단계에 접근하지 못하게 하기 위함이다.
+              -->
+              <p v-if="visitType === PROCESS" class="mt-3 text-label text-text-secondary">
+                <template v-if="nextStep">다음 단계 · <span class="font-medium text-text-primary">{{ nextStep }}</span></template>
+                <template v-else>남은 프로세스 단계가 없습니다</template>
+              </p>
+            </template>
+
+            <!-- 미배정 할 일은 시간을 갖지 않으므로 일정 추가에만 시간 선택이 있다 -->
+            <template v-if="modal === 'add-event'">
+              <p class="mt-4 text-label font-medium text-text-secondary">시간</p>
+              <div v-if="openHours.length" class="mt-2 flex flex-wrap gap-2">
+                <button
+                  v-for="hour in openHours"
+                  :key="hour"
+                  class="flex h-11 items-center"
+                  @click="form.hour = hour"
+                >
+                  <span
+                    class="flex h-9 items-center rounded-lg border px-3 text-label"
+                    :class="form.hour === hour
+                      ? 'border-border-selected bg-selected-bg text-text-primary'
+                      : 'border-border-default text-text-secondary'"
+                  >
+                    {{ hour }}
+                  </span>
+                </button>
+              </div>
+              <p v-else class="mt-2 text-label text-text-secondary">비어 있는 시간이 없습니다</p>
             </template>
           </template>
 
