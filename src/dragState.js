@@ -13,9 +13,11 @@ export const dragState = reactive({
   /* 고스트가 따라갈 포인터 좌표 */
   x: 0,
   y: 0,
-  /* 손가락 아래에 있는 드롭 가능한 시간. 없으면 null */
+  /* 손가락 아래에 있는 드롭 가능한 시간. 없으면 null (아젠다) */
   hoverHour: null,
-  /* 손을 뗀 뒤 확인 대기 중인 배치. { item, itemKind, hour } */
+  /* 손가락 아래에 있는 드롭 가능한 날짜 키. 없으면 null (캘린더) */
+  hoverDate: null,
+  /* 손을 뗀 뒤 확인 대기 중인 배치. { item, itemKind, hour, dateKey } */
   pending: null,
 })
 
@@ -38,10 +40,19 @@ function resetDrag() {
   dragState.item = null
   dragState.itemKind = null
   dragState.hoverHour = null
+  dragState.hoverDate = null
 }
 
-function hourUnder(x, y) {
-  return document.elementFromPoint(x, y)?.closest('[data-drop-hour]')?.dataset.dropHour ?? null
+/*
+ * 아젠다는 시간 칸이, 캘린더는 날짜 칸이 드롭 대상이다.
+ * 두 화면이 같은 드래그를 쓰므로 여기서 한 번에 판정한다.
+ */
+function targetUnder(x, y) {
+  const el = document.elementFromPoint(x, y)
+  return {
+    hour: el?.closest('[data-drop-hour]')?.dataset.dropHour ?? null,
+    date: el?.closest('[data-drop-date]')?.dataset.dropDate ?? null,
+  }
 }
 
 export function startPress(event, item, kind) {
@@ -71,18 +82,26 @@ export function trackDrag(event) {
   if (!dragState.item) return
   dragState.x = event.clientX
   dragState.y = event.clientY
-  dragState.hoverHour = hourUnder(event.clientX, event.clientY)
+  const { hour, date } = targetUnder(event.clientX, event.clientY)
+  dragState.hoverHour = hour
+  dragState.hoverDate = date
 }
 
 /* 손을 뗀 좌표로 다시 판정한다. 직전 hover 값을 그대로 쓰면 안 된다 */
 export function endPress(event) {
   clearPress()
   if (dragState.item) {
-    const hour = Number.isFinite(event?.clientX)
-      ? hourUnder(event.clientX, event.clientY)
-      : dragState.hoverHour
-    if (hour) {
-      dragState.pending = { item: dragState.item, itemKind: dragState.itemKind, hour }
+    const live = Number.isFinite(event?.clientX)
+      ? targetUnder(event.clientX, event.clientY)
+      : { hour: dragState.hoverHour, date: dragState.hoverDate }
+    /* 날짜 칸에 놓으면 시간은 확인 모달에서 고른다 */
+    if (live.hour || live.date) {
+      dragState.pending = {
+        item: dragState.item,
+        itemKind: dragState.itemKind,
+        hour: live.hour,
+        dateKey: live.date,
+      }
     }
   }
   resetDrag()

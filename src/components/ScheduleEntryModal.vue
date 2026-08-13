@@ -33,6 +33,9 @@ const visitType = ref(PROCESS)
 
 const openHours = computed(() => openHoursOn(props.dateKey))
 
+/* 캘린더는 날짜 칸에 놓으므로 시간이 정해지지 않은 채로 온다 */
+const needsHour = computed(() => props.mode === 'add-event' || (props.mode === 'drop' && !props.drop?.hour))
+
 const patientResults = computed(() => {
   const q = form.query.trim()
   if (!q) return recentPatients
@@ -57,6 +60,7 @@ const canConfirm = computed(() => {
       ? Boolean(form.patient) && patientRuleOk.value
       : form.title.trim().length > 0
   }
+  if (needsHour.value && !form.hour) return false
   return activePatient.value ? patientRuleOk.value : true
 })
 
@@ -107,7 +111,7 @@ function confirm() {
     return
   }
 
-  const hour = props.mode === 'drop' ? props.drop.hour : form.hour
+  const hour = props.mode === 'drop' ? (props.drop.hour ?? form.hour) : form.hour
   if (!duplicate.value) {
     const found = duplicateOn(props.dateKey, subjectName())
     if (found) {
@@ -127,7 +131,12 @@ function confirm() {
  * 라우터를 통한 방식(query param 등)으로 다시 붙일 것 — 확인 필요.
  */
 onMounted(() => {
-  form.hour = openHours.value[0] ?? null
+  /*
+   * 드롭은 날짜만 정해서 왔으므로 시간을 기본값으로 채우지 않는다.
+   * 채우면 사용자가 고르지 않은 시간에 그대로 확정될 수 있다.
+   * '일정 추가'는 처음부터 시간을 고르는 흐름이라 첫 후보를 채운다.
+   */
+  form.hour = props.mode === 'drop' ? null : (openHours.value[0] ?? null)
   if (props.mode === 'drop') {
     visitType.value = props.drop?.item?.nextStep ? PROCESS : GENERAL
   }
@@ -164,7 +173,7 @@ watch(() => form.subjectKind, () => { duplicate.value = null })
             <h2 class="text-title-sm font-semibold">{{ title }}</h2>
 
             <p v-if="mode === 'drop'" class="mt-2 text-body text-text-secondary">
-              {{ dayLabel(dateKey) }} {{ drop.hour }} ·
+              {{ dayLabel(dateKey) }}<template v-if="drop.hour"> {{ drop.hour }}</template> ·
               <template v-if="drop.itemKind === 'patient'">
                 {{ drop.item.name }} ({{ drop.item.condition }})
               </template>
@@ -273,8 +282,8 @@ watch(() => form.subjectKind, () => { duplicate.value = null })
               </p>
             </template>
 
-            <!-- 미배정 할 일은 시간을 갖지 않으므로 일정 추가에만 시간 선택이 있다 -->
-            <template v-if="mode === 'add-event'">
+            <!-- 시간이 정해지지 않은 경우에만 고른다. 미배정 할 일은 시간을 갖지 않는다 -->
+            <template v-if="needsHour">
               <p class="mt-4 text-label font-medium text-text-secondary">시간</p>
               <!-- 9칸이 줄바꿈되면 모달이 화면을 넘긴다. 가로 스크롤로 한 줄에 둔다 -->
               <div v-if="openHours.length" class="-mx-6 mt-2 flex gap-2 overflow-x-auto px-6">

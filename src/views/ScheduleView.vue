@@ -3,7 +3,8 @@ import { ref, computed } from 'vue'
 import { ChevronLeft, ChevronRight, ChevronRight as Caret, Plus } from 'lucide-vue-next'
 import { calendarMonth } from '../mocks/calendar.js'
 import { dayLabel, TODAY_KEY, NOW_HOUR } from '../mocks/schedule.js'
-import { monthCells } from '../scheduleState.js'
+import { monthCells, canDropOn } from '../scheduleState.js'
+import { dragState } from '../dragState.js'
 import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
 
 const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일']
@@ -12,6 +13,19 @@ const cells = computed(() => monthCells(calendarMonth))
 
 /* 팝오버의 '일정 추가'가 여는 모달. 날짜만 넘기면 규칙은 모달이 갖는다 */
 const addOnKey = ref(null)
+
+/*
+ * 캘린더는 날짜 칸이 드롭 단위다. 빈 시간이 하나도 없거나 지난 날이면 놓을 수 없다.
+ * 시간은 확인 모달에서 고른다 — 아젠다와 같은 문법이되 단위만 날짜다.
+ */
+function dropState(cell) {
+  if (!dragState.item) return null
+  return canDropOn(cell.key) ? 'active' : 'blocked'
+}
+
+function isFaded(cell) {
+  return dropState(cell) === 'active' && dragState.hoverDate && dragState.hoverDate !== cell.key
+}
 
 /* 셀에는 두 건까지만 보이고 나머지는 접힌다 */
 const visibleEvents = (events) => events.slice(0, 2)
@@ -100,12 +114,18 @@ function isPastEvent(key, hour) {
         <button
           v-for="cell in cells"
           :key="cell.key"
-          class="flex min-h-0 flex-col gap-1 overflow-hidden p-2 text-left"
+          :data-drop-date="dropState(cell) === 'active' ? cell.key : null"
+          class="flex min-h-0 flex-col gap-1 overflow-hidden p-2 text-left transition duration-150 ease-standard"
           :class="[
             cell.dimmed ? 'opacity-40' : '',
-            popover?.cell.key === cell.key
+            isFaded(cell) ? 'opacity-40' : '',
+            dropState(cell) === 'active'
               ? 'bg-selected-bg ring-2 ring-inset ring-border-selected'
-              : 'bg-surface-container',
+              : dropState(cell) === 'blocked'
+                ? 'bg-danger-bg opacity-60 ring-1 ring-inset ring-text-disabled'
+                : popover?.cell.key === cell.key
+                  ? 'bg-selected-bg ring-2 ring-inset ring-border-selected'
+                  : 'bg-surface-container',
           ]"
           @click="openDay(cell, $event)"
         >
@@ -220,6 +240,15 @@ function isPastEvent(key, hour) {
       mode="add-event"
       :date-key="addOnKey"
       @close="addOnKey = null"
+    />
+
+    <!-- 날짜 칸에 놓았을 때. 시간은 모달에서 고른다 -->
+    <ScheduleEntryModal
+      v-if="dragState.pending?.dateKey"
+      mode="drop"
+      :date-key="dragState.pending.dateKey"
+      :drop="dragState.pending"
+      @close="dragState.pending = null"
     />
   </div>
 </template>
