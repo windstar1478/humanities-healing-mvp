@@ -73,23 +73,22 @@ function isPastEvent(key, hour) {
         </button>
       </div>
 
-      <!-- 요일 머리 -->
-      <div class="grid shrink-0 grid-cols-7 pb-2">
-        <!-- 인접 달 칸과 같은 세기로 보여야 해서 opacity까지 맞춘다 -->
-        <div v-for="d in WEEKDAYS" :key="d" class="text-center text-count text-text-secondary opacity-40">
-          {{ d }}
+      <!--
+        요일 머리부터 격자까지 한 판을 subtle로 채우고 날짜 칸만 container로 덮는다.
+        그래서 요일 머리 행과 1px 간격에서는 subtle이 그대로 보인다.
+      -->
+      <div class="flex min-h-0 flex-1 flex-col gap-px bg-border-subtle">
+        <div class="grid shrink-0 grid-cols-7 gap-px py-1">
+          <div
+            v-for="d in WEEKDAYS"
+            :key="d"
+            class="text-center text-count text-text-secondary opacity-40"
+          >
+            {{ d }}
+          </div>
         </div>
-      </div>
 
-      <!--
-        Figma는 셀을 따로 그리지 않는다. 배경을 한 장 깔고 구분선으로만 나눈다.
-        그래서 셀에는 라운드도 개별 배경도 없다.
-      -->
-      <!--
-        격자 전체를 subtle로 채우고 셀을 container로 덮는다. 1px 간격에서
-        subtle이 비쳐 구분선이 되는 구조라 셀에 border를 그리지 않는다.
-      -->
-      <div class="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-px overflow-hidden bg-border-subtle">
+        <div class="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-px overflow-hidden">
         <button
           v-for="cell in cells"
           :key="cell.key"
@@ -140,6 +139,7 @@ function isPastEvent(key, hour) {
             </div>
           </div>
         </button>
+        </div>
       </div>
     </section>
 

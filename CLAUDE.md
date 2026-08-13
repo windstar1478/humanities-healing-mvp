@@ -142,10 +142,12 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 아젠다(홈)와 캘린더(일정)가 같은 데이터를 본다. 화면별 목업을 따로 두지 말 것.
 
 **일정 화면 월 그리드**: 6주 × 7일 42칸 고정. 주 시작은 월요일.
-**격자 전체를 `bg-border-subtle`로 채우고 셀을 `bg-surface-container`로 덮는다.**
-셀 간격 1px에서 subtle이 비쳐 구분선이 되므로 셀에 border를 그리지 않는다.
-셀에는 라운드가 없다. 라운드는 격자 전체에만 8.
-선택된 칸은 `bg-selected-bg` + **2px** `border-border-selected` (accent 3용법 중 선택 상태).
+**요일 머리부터 격자까지 한 판을 `bg-border-subtle`로 채우고, 날짜 칸만
+`bg-surface-container`로 덮는다.** 요일 머리 행과 1px 간격에서는 subtle이 그대로 보인다.
+셀에 border를 그리지 말 것. 라운드도 없다(모서리에서 판이 비쳐 외곽선처럼 보인다).
+요일 머리는 `text-count` + `text-text-secondary` + `opacity-40` — 인접 달 칸과 같은 세기.
+선택된 칸은 `bg-selected-bg` + **`ring-2 ring-inset ring-border-selected`**.
+border로 주면 자리를 차지해 선택 순간 텍스트가 밀린다.
 셀당 일정은 **두 건까지만** 보이고 나머지는 `+N`으로 접힌다.
 앞뒤 달 칸(`emphasis=dimmed`)은 **배경을 바꾸지 않는다.** 칸 전체에 `opacity-40`을 주고
 글자만 `text-text-secondary`로 낮춘다.
