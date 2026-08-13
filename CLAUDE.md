@@ -142,8 +142,10 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 아젠다(홈)와 캘린더(일정)가 같은 데이터를 본다. 화면별 목업을 따로 두지 말 것.
 
 **일정 화면 월 그리드**: 6주 × 7일 42칸 고정. 주 시작은 월요일.
-**셀을 따로 그리지 않는다** — 배경 한 장(`bg-surface-container`)을 깔고 구분선으로만 나눈다.
-그래서 셀에는 개별 배경도 라운드도 없다. 라운드는 격자 전체에만 8.
+**격자 전체를 `bg-border-subtle`로 채우고 셀을 `bg-surface-container`로 덮는다.**
+셀 간격 1px에서 subtle이 비쳐 구분선이 되므로 셀에 border를 그리지 않는다.
+셀에는 라운드가 없다. 라운드는 격자 전체에만 8.
+선택된 칸은 `bg-selected-bg` + **2px** `border-border-selected` (accent 3용법 중 선택 상태).
 셀당 일정은 **두 건까지만** 보이고 나머지는 `+N`으로 접힌다.
 앞뒤 달 칸(`emphasis=dimmed`)은 **배경을 바꾸지 않는다.** 칸 전체에 `opacity-40`을 주고
 글자만 `text-text-secondary`로 낮춘다.
@@ -152,6 +154,7 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 **날짜 팝오버**: 일정이 있는 칸을 탭하면 그날 목록이 열린다. 폭 280 / 최대 높이 364.
 가벼운 콘텐츠이므로 **모달이 아니라 팝오버** — 외부 탭으로 닫고 history entry를 만들지 않는다.
 환자 일정에만 우측 chevron(상세 진입). 일정이 없는 칸은 열리지 않는다.
+칸 오른쪽 8px에 붙이고 세로는 칸 중앙에 맞추되 화면 밖으로 나가지 않게 가둔다.
 
 **모달 내부 라운드 위계**: 카드 16 → 그 안은 전부 8. 리스트는 컨테이너 하나(8, border)로
 묶고 **행은 라운드 없이 구분선으로만** 나눈다. 라운드 8짜리는 전부 1px border를 갖는다.

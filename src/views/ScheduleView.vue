@@ -20,18 +20,26 @@ const popover = ref(null)
 
 function openDay(cell, event) {
   if (!cell.events.length) return
-  const rect = event.currentTarget.getBoundingClientRect()
-  popover.value = { cell, x: rect.right, y: rect.bottom }
+  const r = event.currentTarget.getBoundingClientRect()
+  popover.value = { cell, anchor: { right: r.right, top: r.top, height: r.height } }
 }
 
-/* 화면 밖으로 나가지 않게 가둔다 */
+/* 칸 오른쪽에 붙이고 세로는 칸 중앙에 맞춘다. 화면 밖으로는 나가지 않는다 */
 const popoverStyle = computed(() => {
   if (!popover.value) return {}
-  const width = 280
-  const height = 364
-  const left = Math.min(popover.value.x - width / 2, window.innerWidth - width - 24)
-  const top = Math.min(popover.value.y - height / 2, window.innerHeight - height - 24)
-  return { left: `${Math.max(24, left)}px`, top: `${Math.max(24, top)}px`, width: `${width}px` }
+  const WIDTH = 280
+  const HEIGHT = 364
+  const GAP = 8
+  const MARGIN = 24
+  const { right, top, height } = popover.value.anchor
+  const left = Math.min(right + GAP, window.innerWidth - WIDTH - MARGIN)
+  const wanted = top + height / 2 - HEIGHT / 2
+  const maxTop = window.innerHeight - HEIGHT - MARGIN
+  return {
+    left: `${Math.max(MARGIN, left)}px`,
+    top: `${Math.min(Math.max(MARGIN, wanted), maxTop)}px`,
+    width: `${WIDTH}px`,
+  }
 })
 
 /* 지난 일정은 명도를 낮춘다 — 아젠다와 같은 규칙 */
@@ -76,17 +84,22 @@ function isPastEvent(key, hour) {
         Figma는 셀을 따로 그리지 않는다. 배경을 한 장 깔고 구분선으로만 나눈다.
         그래서 셀에는 라운드도 개별 배경도 없다.
       -->
-      <div class="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 overflow-hidden rounded-lg bg-surface-container">
+      <!--
+        격자 전체를 subtle로 채우고 셀을 container로 덮는다. 1px 간격에서
+        subtle이 비쳐 구분선이 되는 구조라 셀에 border를 그리지 않는다.
+      -->
+      <div class="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-px overflow-hidden rounded-lg bg-border-subtle">
         <button
-          v-for="(cell, i) in cells"
+          v-for="cell in cells"
           :key="cell.key"
-          class="flex min-h-0 flex-col gap-1 overflow-hidden p-2 text-left active:bg-surface-pressed"
-          @click="openDay(cell, $event)"
+          class="flex min-h-0 flex-col gap-1 overflow-hidden p-2 text-left"
           :class="[
-            i % 7 !== 6 ? 'border-r border-border-subtle' : '',
-            i < 35 ? 'border-b border-border-subtle' : '',
             cell.dimmed ? 'opacity-40' : '',
+            popover?.cell.key === cell.key
+              ? 'border-2 border-border-selected bg-selected-bg'
+              : 'bg-surface-container',
           ]"
+          @click="openDay(cell, $event)"
         >
           <!-- 날짜 · 오늘 · 접힌 건수 -->
           <div class="flex shrink-0 items-baseline gap-1">
