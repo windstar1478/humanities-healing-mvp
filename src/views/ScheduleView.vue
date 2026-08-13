@@ -1,12 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { ChevronLeft, ChevronRight, ChevronRight as Caret, Plus } from 'lucide-vue-next'
-import { calendarMonth, buildMonthCells } from '../mocks/calendar.js'
+import { calendarMonth } from '../mocks/calendar.js'
 import { dayLabel, TODAY_KEY, NOW_HOUR } from '../mocks/schedule.js'
+import { monthCells } from '../scheduleState.js'
+import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
 
 const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일']
 
-const cells = computed(() => buildMonthCells(calendarMonth))
+const cells = computed(() => monthCells(calendarMonth))
+
+/* 팝오버의 '일정 추가'가 여는 모달. 날짜만 넘기면 규칙은 모달이 갖는다 */
+const addOnKey = ref(null)
 
 /* 셀에는 두 건까지만 보이고 나머지는 접힌다 */
 const visibleEvents = (events) => events.slice(0, 2)
@@ -67,7 +72,10 @@ function isPastEvent(key, hour) {
       <!-- 이번 달 / 일정 추가 -->
       <div class="flex h-11 shrink-0 items-center justify-between">
         <span class="text-label font-medium text-text-secondary">이번 달</span>
-        <button class="flex h-11 items-center gap-1 pl-2 text-label font-medium text-text-secondary active:text-text-primary">
+        <button
+          class="flex h-11 items-center gap-1 pl-2 text-label font-medium text-text-secondary active:text-text-primary"
+          @click="addOnKey = TODAY_KEY"
+        >
           <Plus :size="16" class="shrink-0" />
           <span>일정 추가</span>
         </button>
@@ -161,7 +169,10 @@ function isPastEvent(key, hour) {
               <span class="flex-1"></span>
               <span class="shrink-0 text-count text-text-secondary">{{ popover.cell.events.length }}건</span>
             </div>
-            <button class="flex h-11 items-center gap-1 text-label font-medium text-text-secondary active:text-text-primary">
+            <button
+              class="flex h-11 items-center gap-1 text-label font-medium text-text-secondary active:text-text-primary"
+              @click="addOnKey = popover.cell.key; popover = null"
+            >
               <Plus :size="16" class="shrink-0" />
               <span>일정 추가</span>
             </button>
@@ -203,5 +214,12 @@ function isPastEvent(key, hour) {
         </div>
       </div>
     </Teleport>
+
+    <ScheduleEntryModal
+      v-if="addOnKey"
+      mode="add-event"
+      :date-key="addOnKey"
+      @close="addOnKey = null"
+    />
   </div>
 </template>
