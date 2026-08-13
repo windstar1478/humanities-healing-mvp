@@ -75,7 +75,8 @@ function isPastEvent(key, hour) {
 
       <!-- 요일 머리 -->
       <div class="grid shrink-0 grid-cols-7 pb-2">
-        <div v-for="d in WEEKDAYS" :key="d" class="text-center text-count text-text-secondary">
+        <!-- 인접 달 칸과 같은 세기로 보여야 해서 opacity까지 맞춘다 -->
+        <div v-for="d in WEEKDAYS" :key="d" class="text-center text-count text-text-secondary opacity-40">
           {{ d }}
         </div>
       </div>
@@ -88,7 +89,7 @@ function isPastEvent(key, hour) {
         격자 전체를 subtle로 채우고 셀을 container로 덮는다. 1px 간격에서
         subtle이 비쳐 구분선이 되는 구조라 셀에 border를 그리지 않는다.
       -->
-      <div class="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-px overflow-hidden rounded-lg bg-border-subtle">
+      <div class="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-px overflow-hidden bg-border-subtle">
         <button
           v-for="cell in cells"
           :key="cell.key"
@@ -96,7 +97,7 @@ function isPastEvent(key, hour) {
           :class="[
             cell.dimmed ? 'opacity-40' : '',
             popover?.cell.key === cell.key
-              ? 'border-2 border-border-selected bg-selected-bg'
+              ? 'bg-selected-bg ring-2 ring-inset ring-border-selected'
               : 'bg-surface-container',
           ]"
           @click="openDay(cell, $event)"
