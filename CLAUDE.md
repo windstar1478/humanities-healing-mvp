@@ -145,9 +145,9 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 **셀을 따로 그리지 않는다** — 배경 한 장(`bg-surface-container`)을 깔고 구분선으로만 나눈다.
 그래서 셀에는 개별 배경도 라운드도 없다. 라운드는 격자 전체에만 8.
 셀당 일정은 **두 건까지만** 보이고 나머지는 `+N`으로 접힌다.
-앞뒤 달 칸은 글자를 흐리게 하고 배경도 `bg-surface-canvas`로 한 단계 낮춘다.
-요일 머리는 `text-count` + `text-text-disabled`.
-(위 두 색은 Figma 대조 없이 스크린샷에서 추론한 값 — **확인 필요**)
+앞뒤 달 칸(`emphasis=dimmed`)은 **배경을 바꾸지 않는다.** 칸 전체에 `opacity-40`을 주고
+글자만 `text-text-secondary`로 낮춘다.
+요일 머리는 `text-count`(11) + `text-text-secondary`.
 
 **날짜 팝오버**: 일정이 있는 칸을 탭하면 그날 목록이 열린다. 폭 280 / 최대 높이 364.
 가벼운 콘텐츠이므로 **모달이 아니라 팝오버** — 외부 탭으로 닫고 history entry를 만들지 않는다.

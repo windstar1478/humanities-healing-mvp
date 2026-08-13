@@ -67,7 +67,7 @@ function isPastEvent(key, hour) {
 
       <!-- 요일 머리 -->
       <div class="grid shrink-0 grid-cols-7 pb-2">
-        <div v-for="d in WEEKDAYS" :key="d" class="text-center text-count text-text-disabled">
+        <div v-for="d in WEEKDAYS" :key="d" class="text-center text-count text-text-secondary">
           {{ d }}
         </div>
       </div>
@@ -85,7 +85,7 @@ function isPastEvent(key, hour) {
           :class="[
             i % 7 !== 6 ? 'border-r border-border-subtle' : '',
             i < 35 ? 'border-b border-border-subtle' : '',
-            cell.dimmed ? 'bg-surface-canvas' : '',
+            cell.dimmed ? 'opacity-40' : '',
           ]"
         >
           <!-- 날짜 · 오늘 · 접힌 건수 -->
@@ -94,7 +94,7 @@ function isPastEvent(key, hour) {
               class="text-label font-medium"
               :class="cell.isToday
                 ? 'text-interactive-default'
-                : cell.dimmed ? 'text-text-disabled' : 'text-text-primary'"
+                : cell.dimmed ? 'text-text-secondary' : 'text-text-primary'"
             >
               {{ cell.date }}
             </span>
@@ -119,7 +119,7 @@ function isPastEvent(key, hour) {
               ></span>
               <span
                 class="truncate text-count"
-                :class="cell.dimmed ? 'text-text-disabled' : 'text-text-primary'"
+                :class="cell.dimmed ? 'text-text-secondary' : 'text-text-primary'"
               >
                 {{ event.title }}
               </span>
