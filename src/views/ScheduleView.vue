@@ -11,8 +11,15 @@ const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일']
 
 const cells = computed(() => monthCells(calendarMonth))
 
-/* 팝오버의 '일정 추가'가 여는 모달. 날짜만 넘기면 규칙은 모달이 갖는다 */
+/*
+ * '일정 추가'가 여는 모달.
+ * 팝오버에서 열면 날짜가 정해져 있고, 상단 버튼에서 열면 모달에서 고른다.
+ */
+const addOpen = ref(false)
 const addOnKey = ref(null)
+
+/* 배치할 수 있는 날짜만 고를 수 있게 한다 — 드롭 규칙과 동일 */
+const openDates = computed(() => cells.value.filter((c) => canDropOn(c.key)).map((c) => c.key))
 
 /*
  * 캘린더는 날짜 칸이 드롭 단위다. 빈 시간이 하나도 없거나 지난 날이면 놓을 수 없다.
@@ -88,7 +95,7 @@ function isPastEvent(key, hour) {
         <span class="text-label font-medium text-text-secondary">이번 달</span>
         <button
           class="flex h-11 items-center gap-1 pl-2 text-label font-medium text-text-secondary active:text-text-primary"
-          @click="addOnKey = TODAY_KEY"
+          @click="addOnKey = null; addOpen = true"
         >
           <Plus :size="16" class="shrink-0" />
           <span>일정 추가</span>
@@ -191,7 +198,7 @@ function isPastEvent(key, hour) {
             </div>
             <button
               class="flex h-11 items-center gap-1 text-label font-medium text-text-secondary active:text-text-primary"
-              @click="addOnKey = popover.cell.key; popover = null"
+              @click="addOnKey = popover.cell.key; addOpen = true; popover = null"
             >
               <Plus :size="16" class="shrink-0" />
               <span>일정 추가</span>
@@ -236,10 +243,11 @@ function isPastEvent(key, hour) {
     </Teleport>
 
     <ScheduleEntryModal
-      v-if="addOnKey"
+      v-if="addOpen"
       mode="add-event"
       :date-key="addOnKey"
-      @close="addOnKey = null"
+      :date-options="openDates"
+      @close="addOpen = false; addOnKey = null"
     />
 
     <!-- 날짜 칸에 놓았을 때. 시간은 모달에서 고른다 -->

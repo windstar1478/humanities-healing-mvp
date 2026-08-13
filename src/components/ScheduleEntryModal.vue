@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Search } from 'lucide-vue-next'
 import { GENERAL, PROCESS } from '../mocks/home.js'
 import { recentPatients, allPatients } from '../mocks/patients.js'
-import { dayLabel } from '../mocks/schedule.js'
+import { dayLabel, shortDayLabel } from '../mocks/schedule.js'
 import { openHoursOn, duplicateOn, addEvent } from '../scheduleState.js'
 
 /*
@@ -16,7 +16,10 @@ import { openHoursOn, duplicateOn, addEvent } from '../scheduleState.js'
 const props = defineProps({
   /* 'drop' | 'add-event' | 'add-task' */
   mode: { type: String, required: true },
-  dateKey: { type: String, required: true },
+  /* 날짜가 정해져 있으면 넘긴다. null이면 모달에서 고른다 */
+  dateKey: { type: String, default: null },
+  /* dateKey가 없을 때 고를 수 있는 날짜들 */
+  dateOptions: { type: Array, default: () => [] },
   /* mode='drop'일 때 { item, itemKind, hour } */
   drop: { type: Object, default: null },
 })
@@ -28,11 +31,15 @@ const patientOptions = [...recentPatients, ...allPatients].filter(
   (p, i, arr) => arr.findIndex((q) => q.name === p.name) === i,
 )
 
-const form = reactive({ subjectKind: 'patient', patient: null, query: '', title: '', category: '', hour: null })
+const form = reactive({ subjectKind: 'patient', patient: null, query: '', title: '', category: '', date: null, hour: null })
+
+/* 날짜가 넘어왔으면 그것을, 아니면 모달에서 고른 날짜를 쓴다 */
+const activeDate = computed(() => props.dateKey ?? form.date)
+const needsDate = computed(() => !props.dateKey && props.mode !== 'add-task')
 const duplicate = ref(null)
 const visitType = ref(PROCESS)
 
-const openHours = computed(() => openHoursOn(props.dateKey))
+const openHours = computed(() => (activeDate.value ? openHoursOn(activeDate.value) : []))
 
 /* 캘린더는 날짜 칸에 놓으므로 시간이 정해지지 않은 채로 온다 */
 const needsHour = computed(() => props.mode === 'add-event' || (props.mode === 'drop' && !props.drop?.hour))
@@ -55,13 +62,13 @@ const patientRuleOk = computed(() => visitType.value === GENERAL || Boolean(next
 
 const canConfirm = computed(() => {
   if (props.mode === 'add-task') return form.title.trim().length > 0
+  if (needsDate.value && !form.date) return false
+  if (needsHour.value && !form.hour) return false
   if (props.mode === 'add-event') {
-    if (!form.hour) return false
     return form.subjectKind === 'patient'
       ? Boolean(form.patient) && patientRuleOk.value
       : form.title.trim().length > 0
   }
-  if (needsHour.value && !form.hour) return false
   return activePatient.value ? patientRuleOk.value : true
 })
 
@@ -114,14 +121,14 @@ function confirm() {
 
   const hour = props.mode === 'drop' ? (props.drop.hour ?? form.hour) : form.hour
   if (!duplicate.value) {
-    const found = duplicateOn(props.dateKey, subjectName())
+    const found = duplicateOn(activeDate.value, subjectName())
     if (found) {
       duplicate.value = found
       return
     }
   }
-  addEvent(props.dateKey, buildEvent(hour))
-  emit('placed', { dateKey: props.dateKey, hour })
+  addEvent(activeDate.value, buildEvent(hour))
+  emit('placed', { dateKey: activeDate.value, hour })
   dismiss()
 }
 
@@ -161,6 +168,12 @@ onMounted(() => {
 })
 
 watch(() => form.subjectKind, () => { duplicate.value = null })
+
+/* 날짜가 바뀌면 그 날의 빈 시간이 달라지므로 시간 선택을 비운다 */
+watch(() => form.date, () => {
+  form.hour = null
+  duplicate.value = null
+})
 </script>
 
 <template>
@@ -177,7 +190,7 @@ watch(() => form.subjectKind, () => { duplicate.value = null })
           <template v-if="duplicate">
             <h2 class="text-title-sm font-semibold">이미 배치된 대상입니다</h2>
             <p class="mt-2 text-body text-text-secondary">
-              {{ dayLabel(dateKey) }} {{ duplicate.hour }}에
+              {{ dayLabel(activeDate) }} {{ duplicate.hour }}에
               <span class="text-text-primary">{{ duplicate.title }}</span> 일정이 이미 있습니다.
               그래도 배치할까요?
             </p>
@@ -187,7 +200,7 @@ watch(() => form.subjectKind, () => { duplicate.value = null })
             <h2 class="text-title-sm font-semibold">{{ title }}</h2>
 
             <p v-if="mode === 'drop'" class="mt-2 text-body text-text-secondary">
-              {{ dayLabel(dateKey) }}<template v-if="drop.hour"> {{ drop.hour }}</template> ·
+              {{ dayLabel(activeDate) }}<template v-if="drop.hour"> {{ drop.hour }}</template> ·
               <template v-if="drop.itemKind === 'patient'">
                 {{ drop.item.name }} ({{ drop.item.condition }})
               </template>
@@ -230,7 +243,10 @@ watch(() => form.subjectKind, () => { duplicate.value = null })
                   />
                 </div>
                 <!-- 리스트는 컨테이너 하나로 묶고 행은 구분선으로만 나눈다 -->
-                <div class="mt-2 max-h-36 overflow-y-auto rounded-lg border border-border-default">
+                <p class="mt-2 text-count text-text-secondary">
+                  {{ form.query.trim() ? '검색 결과' : '최근' }}
+                </p>
+                <div class="mt-1 max-h-36 overflow-y-auto rounded-lg border border-border-default">
                   <button
                     v-for="(p, i) in patientResults"
                     :key="p.id"
@@ -296,8 +312,31 @@ watch(() => form.subjectKind, () => { duplicate.value = null })
               </p>
             </template>
 
+            <!-- 캘린더 상단에서 열면 날짜가 정해져 있지 않다. 시간보다 먼저 고른다 -->
+            <template v-if="needsDate">
+              <p class="mt-4 text-label font-medium text-text-secondary">날짜</p>
+              <div v-if="dateOptions.length" class="-mx-6 mt-2 flex gap-2 overflow-x-auto px-6">
+                <button
+                  v-for="key in dateOptions"
+                  :key="key"
+                  class="flex h-11 shrink-0 items-center"
+                  @click="form.date = key"
+                >
+                  <span
+                    class="flex h-9 items-center rounded-lg border px-3 text-label"
+                    :class="form.date === key
+                      ? 'border-border-selected bg-selected-bg text-text-primary'
+                      : 'border-border-default text-text-secondary'"
+                  >
+                    {{ shortDayLabel(key) }}
+                  </span>
+                </button>
+              </div>
+              <p v-else class="mt-2 text-label text-text-secondary">배치할 수 있는 날짜가 없습니다</p>
+            </template>
+
             <!-- 시간이 정해지지 않은 경우에만 고른다. 미배정 할 일은 시간을 갖지 않는다 -->
-            <template v-if="needsHour">
+            <template v-if="needsHour && activeDate">
               <p class="mt-4 text-label font-medium text-text-secondary">시간</p>
               <!-- 9칸이 줄바꿈되면 모달이 화면을 넘긴다. 가로 스크롤로 한 줄에 둔다 -->
               <div v-if="openHours.length" class="-mx-6 mt-2 flex gap-2 overflow-x-auto px-6">

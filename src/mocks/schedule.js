@@ -71,6 +71,12 @@ export function toKey(year, month, date) {
   return `${year}-${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`
 }
 
+/* 칩처럼 좁은 자리에 쓰는 짧은 형태. 예: 7/30 (목) */
+export function shortDayLabel(key) {
+  const [y, m, d] = key.split('-').map(Number)
+  return `${m}/${d} (${WEEKDAY_LABELS[new Date(y, m - 1, d).getDay()]})`
+}
+
 export function dayLabel(key) {
   const [y, m, d] = key.split('-').map(Number)
   const weekday = WEEKDAY_LABELS[new Date(y, m - 1, d).getDay()]

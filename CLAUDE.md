@@ -70,6 +70,10 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
   라운드 16, 폭 360, `border-border-default`, 스크림은 `--scrim`
   - 확정 버튼 `bg-surface-inverse`, 취소 버튼 `border-border-default` (둘 다 시각 36 / 터치 44)
   - 시간 선택지는 **드롭 가능 규칙과 동일**하다 (비어 있고 지나지 않은 시간)
+  - **날짜가 정해지지 않은 경로에서는 날짜를 먼저 고른다.** 캘린더 상단 '일정 추가'가
+    그렇다. 날짜를 바꾸면 그 날의 빈 시간으로 목록이 갱신되고 시간 선택은 초기화된다.
+    아젠다·팝오버에서 열면 날짜가 이미 정해져 있어 날짜 선택이 나오지 않는다
+  - 환자 리스트 위에는 `최근` / `검색 결과` 라벨을 둔다 (`text-count`)
   - 미배정 할 일은 시간을 갖지 않으므로 '할 일 추가'에는 시간 선택이 없다
   - 확인 모달과 드래그 고스트는 **Figma 화면이 없는 초안**이다. 디자인 확정 시 교체할 것
   - 확인·확정 버튼은 `bg-surface-inverse` + `text-text-inverse`.
