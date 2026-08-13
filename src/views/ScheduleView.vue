@@ -104,7 +104,7 @@ function isPastEvent(key, hour) {
           <div
             v-for="d in WEEKDAYS"
             :key="d"
-            class="text-center text-count text-text-secondary opacity-40"
+            class="text-center text-count text-text-secondary"
           >
             {{ d }}
           </div>

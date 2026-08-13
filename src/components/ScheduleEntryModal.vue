@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Search } from 'lucide-vue-next'
 import { GENERAL, PROCESS } from '../mocks/home.js'
 import { recentPatients, allPatients } from '../mocks/patients.js'
@@ -125,12 +126,29 @@ function confirm() {
 }
 
 /*
- * 제스처 뒤로가기로 닫는 처리는 아직 없다.
- * history.pushState로 직접 엔트리를 만들면 vue-router가 모르는 엔트리가 생기고,
- * history.back()의 popstate를 라우터가 route 이동으로 처리해 화면이 튕긴다.
- * 라우터를 통한 방식(query param 등)으로 다시 붙일 것 — 확인 필요.
+ * PWA standalone에는 뒤로가기 버튼이 없지만 Android 제스처 뒤로가기는 살아 있다.
+ * 모달이 history에 없으면 그 제스처가 앱 이탈로 이어지므로 엔트리를 남긴다.
+ *
+ * 단, history.pushState로 직접 만들면 안 된다. vue-router는 자기 history 스택을
+ * 따로 관리하는데, 라우터가 모르는 엔트리가 끼면 history.back()의 popstate를
+ * 라우터가 'route 이동'으로 해석해 다른 화면으로 튕긴다.
+ * 그래서 엔트리 생성·소멸을 전부 라우터에게 맡긴다.
  */
+const route = useRoute()
+const router = useRouter()
+
+/* 쿼리가 사라지면(뒤로가기든 버튼이든) 닫힌다 */
+watch(
+  () => route.query.modal,
+  (value) => { if (!value) emit('close') },
+)
+
+function dismiss() {
+  router.back()
+}
+
 onMounted(() => {
+  router.push({ query: { ...route.query, modal: props.mode } })
   /*
    * 드롭은 날짜만 정해서 왔으므로 시간을 기본값으로 채우지 않는다.
    * 채우면 사용자가 고르지 않은 시간에 그대로 확정될 수 있다.
@@ -141,10 +159,6 @@ onMounted(() => {
     visitType.value = props.drop?.item?.nextStep ? PROCESS : GENERAL
   }
 })
-
-function dismiss() {
-  emit('close')
-}
 
 watch(() => form.subjectKind, () => { duplicate.value = null })
 </script>

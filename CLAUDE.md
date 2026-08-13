@@ -145,7 +145,8 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 **요일 머리부터 격자까지 한 판을 `bg-border-subtle`로 채우고, 날짜 칸만
 `bg-surface-container`로 덮는다.** 요일 머리 행과 1px 간격에서는 subtle이 그대로 보인다.
 셀에 border를 그리지 말 것. 라운드도 없다(모서리에서 판이 비쳐 외곽선처럼 보인다).
-요일 머리는 `text-count` + `text-text-secondary` + `opacity-40` — 인접 달 칸과 같은 세기.
+요일 머리는 `text-count` + `text-text-secondary` (opacity 없음).
+subtle 배경 위라 opacity를 씌우면 글자가 배경에 씻겨 읽히지 않는다.
 선택된 칸은 `bg-selected-bg` + **`ring-2 ring-inset ring-border-selected`**.
 border로 주면 자리를 차지해 선택 순간 텍스트가 밀린다.
 셀당 일정은 **두 건까지만** 보이고 나머지는 `+N`으로 접힌다.
@@ -199,9 +200,10 @@ border로 주면 자리를 차지해 선택 순간 텍스트가 밀린다.
 - `176:5079` — 비활성 사유를 설명하는 인라인 경고 콜아웃 (주황 테두리 + ⚠)
 - `189:8259` `188:7591` — calendar modal / row 컴포넌트
 
-**모달은 아직 제스처 뒤로가기로 닫히지 않는다.** `history.pushState`로 직접 엔트리를
-만들면 vue-router가 모르는 엔트리가 생기고, `history.back()`의 popstate를 라우터가
-route 이동으로 처리해 다른 화면으로 튕긴다. 라우터를 통한 방식으로 다시 붙일 것.
+**모달 history는 반드시 라우터를 거친다.** 열 때 `router.push({ query: { modal } })`,
+닫을 때 `router.back()`, `route.query.modal`이 사라지면 닫는다.
+`history.pushState`로 직접 엔트리를 만들면 vue-router가 모르는 엔트리가 생기고,
+`history.back()`의 popstate를 라우터가 route 이동으로 처리해 다른 화면으로 튕긴다.
 
 미해결:
 - 실기기 논리 해상도 실측 (기기 미수령). Figma 프레임 1138×712도 추정값
