@@ -100,6 +100,26 @@ export function leadEvent(events) {
   return pool[pool.length - 1]
 }
 
+/*
+ * 그 환자의 마지막 진료와 다음 일정. 환자 리스트가 쓴다.
+ * 일정에서 직접 뽑는다 — 환자 레코드에 따로 적어두면 배치할 때마다 갱신해야 하고,
+ * 한쪽만 갱신되면 두 화면이 갈라진다.
+ * 업무 블록은 진료가 아니므로 환자 일정(bar)만 본다.
+ */
+export function visitsOf(name) {
+  let last = null
+  let next = null
+  Object.keys(scheduleState.byDate).sort().forEach((key) => {
+    scheduleState.byDate[key].forEach((event) => {
+      if (!event.bar || event.title !== name) return
+      const past = key < TODAY_KEY || (key === TODAY_KEY && event.hour < NOW_HOUR)
+      if (past) last = key
+      else if (!next) next = key
+    })
+  })
+  return { last, next }
+}
+
 function hourState(key, hour) {
   if (key < TODAY_KEY) return 'past'
   if (key > TODAY_KEY) return 'upcoming'

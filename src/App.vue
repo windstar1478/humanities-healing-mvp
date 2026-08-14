@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   ClipboardList, CalendarDays, Users, TrendingUp, PenTool,
   Bell, Settings, Sun, Moon,
@@ -22,6 +23,15 @@ const navGroups = [
     { label: '저작도구',    to: '/authoring',     icon: PenTool },
   ],
 ]
+
+/*
+ * 하위 경로(전체 환자 리스트)에서도 상위 메뉴가 켜져 있어야 한다.
+ * 홈만 완전 일치로 본다 — startsWith로 보면 모든 경로가 걸린다.
+ */
+const route = useRoute()
+function isCurrent(to) {
+  return to === '/' ? route.path === '/' : route.path.startsWith(to)
+}
 
 const isDark = ref(false)
 function setTheme(dark) {
@@ -62,7 +72,7 @@ onUnmounted(() => {
           :key="item.to"
           :to="item.to"
           class="flex h-12 items-center gap-2 whitespace-nowrap rounded-lg px-2.5 text-label font-medium"
-          :class="$route.path === item.to
+          :class="isCurrent(item.to)
             ? 'bg-surface-inverse text-text-inverse'
             : 'text-text-secondary'"
         >
@@ -117,12 +127,19 @@ onUnmounted(() => {
 </nav>
 
     <!-- 중앙 -->
-    <main class="flex flex-1 gap-2 overflow-y-auto rounded-2xl bg-surface-container px-9">
+    <!-- 좌우 패딩은 화면마다 다르다. 분석은 36, 전체 리스트는 24 -->
+    <main
+      class="flex flex-1 gap-2 overflow-y-auto rounded-2xl bg-surface-container"
+      :class="$route.meta.fullWidth ? 'px-6' : 'px-9'"
+    >
       <RouterView />
     </main>
 
-    <!-- 우: 환자 패널 -->
-    <aside class="flex w-[274px] shrink-0 flex-col gap-1 overflow-y-auto rounded-2xl bg-surface-container px-6 py-4">
+    <!-- 우: 환자 패널. 전체 환자 리스트 화면은 이 패널을 쓰지 않는다 -->
+    <aside
+      v-if="!$route.meta.fullWidth"
+      class="flex w-[274px] shrink-0 flex-col gap-1 overflow-y-auto rounded-2xl bg-surface-container px-6 py-4"
+    >
       <!-- 검색 -->
       <button class="mx-3 flex h-11 shrink-0 items-center gap-4 rounded-lg border border-border-default bg-surface-field px-3 text-text-disabled active:bg-surface-pressed">
         <Search :size="20" class="shrink-0" />

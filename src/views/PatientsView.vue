@@ -1,5 +1,6 @@
 <script setup>
 import { reactive, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { X, RotateCcw, Mars, Venus, ChevronRight } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import { dimensions, initialFilters } from '../mocks/analysis.js'
@@ -102,15 +103,30 @@ function reset() {
   dimensions.forEach((d) => { filters[d.id] = [] })
 }
 
+/*
+ * KPI를 누르면 전체 환자 리스트로 간다. 지금 걸린 칩을 쿼리로 넘겨
+ * '5명'을 누른 결과가 5명이 되게 한다.
+ */
+const router = useRouter()
+
+function openList() {
+  const query = {}
+  dimensions.forEach((d) => {
+    if (filters[d.id].length) query[d.id] = filters[d.id].join(',')
+  })
+  router.push({ path: '/patients/list', query })
+}
+
 const barClass = (picked) => (picked ? 'bg-chart-bar-selected' : 'bg-chart-bar-default')
 const textClass = (picked) => (picked ? 'text-text-primary' : 'text-text-secondary')
 </script>
 
 <template>
   <div class="flex flex-1 flex-col justify-center gap-2 py-4">
-    <!-- 필터 결과 수. 환자 목록으로 들어가는 자리다 (목록 화면 미구현) -->
+    <!-- 필터 결과 수. 누르면 그 조건 그대로 전체 환자 리스트로 간다 -->
     <button
       class="flex shrink-0 items-center gap-3 rounded-lg border border-border-default bg-surface-card py-4 pl-8 pr-3 text-left active:bg-surface-card-pressed"
+      @click="openList"
     >
       <span class="flex min-w-0 flex-1 flex-col">
         <span class="text-kpi font-bold text-text-primary">
