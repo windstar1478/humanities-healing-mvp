@@ -80,7 +80,8 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
   - **놓을 수 없는 자리를 눌렀을 때는 이유를 말한다.** 아무 반응이 없으면 고장으로 읽힌다.
     지난 시간(아젠다) · 지난 날짜(캘린더)를 누르면 **비활성 사유 콜아웃**이
     팝오버 자리에 뜬다: `border-warning-fg` + `TriangleAlert`.
-    **Figma `176:5079`(주황 테두리 + ⚠)를 아직 열지 않아 초안이다**
+    ⚠ **지금 모양이 어색하다는 지적을 받았다. 고쳐야 한다.**
+    Figma 목업이 다른 화면 안에 있으니 그것(`176:5079` 포함)을 보고 교체할 것
   - 캘린더 팝오버의 업무 행 탭 → 작업 상세. 팝오버를 먼저 닫아
     모달만 history 엔트리를 갖게 한다
 - **모달은 하나의 셸(`ModalShell.vue`)을 공유한다**: 배치 확인 · 일정 추가 ·
@@ -114,9 +115,13 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
   - **opacity가 아니라 배경 토큰을 쓴다.** opacity는 글자까지 같이 씻어내서
     `opacity-40`은 제목 4.44 · 메타 2.99(AA 미달), `opacity-80`도 4.68까지밖에 못 올린다.
     배경만 바꾸면 글자가 온전한 토큰 대비를 유지한다 — 실측 제목 7.21 · 메타 7.21 · 시간 7.75
-  - **표면은 한 단계씩 내려간다**: 평소 행 `surface-card` / 블록 `surface-container`,
-    지난 행 `surface-container` / 블록 `surface-canvas`.
+  - **표면 계단**: 평소 행 `surface-card` / 블록 `surface-container`,
+    지난 행 `surface-recessed` / 블록 `surface-canvas`.
     이 순서는 라이트·다크 양쪽에서 같은 방향이다
+  - `surface-recessed`는 container보다 **반 단계** 아래다
+    (`neutral-75` = 50↔100의 중간 / 다크 `neutral-925` = 900↔950의 중간).
+    한 단계를 통째로 내리면 블록과의 간격이 사라져 띠가 뭉갠다.
+    반 단계 값을 새로 만든 것은 다크 카드용 `neutral-850`과 같은 선례를 따른 것이다
   - 제목은 지난 행에서 secondary로 낮춘다
   - 드래그 중에는 이 배경을 적용하지 않는다. blocked 표현과 겹친다
   - **진행 중은 명도가 아니라 accent 배지로 표시**: '진행 중' = `text-interactive-default` + bold
@@ -177,6 +182,9 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 `src/style.css`의 2레이어 토큰 시스템을 사용한다.
 
 - **Layer 1 Primitives** (`--color-neutral-*`, `--color-brand-*` 등): 화면 코드에서 **직접 사용 금지**
+  - Figma 스케일에 없는 값이 필요하면 **구간의 중간값을 새 primitive로** 만든다.
+    `neutral-850`(다크 카드) · `neutral-75`/`neutral-925`(지난 시간 띠)가 그 예다.
+    화면 코드에 임의 값을 적지 않기 위한 것이므로 반드시 Semantic 토큰을 하나 붙일 것
 - **Layer 2 Semantic** (`bg-surface-card`, `text-text-primary`, `border-border-subtle` 등): 화면 코드는 이것만 사용
 - **다크모드**: `.dark`에서 Semantic만 재매핑. 화면 코드에 `dark:` 유틸리티를 쓰지 말 것
 - 임의 값(`text-[14px]`, `bg-[#fff]`) 사용 금지. 기존 토큰으로 흡수하거나 토큰을 추가

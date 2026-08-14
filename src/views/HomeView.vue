@@ -114,7 +114,7 @@ function isSelected(row) {
 
 /*
  * 일정 블록은 행 배경보다 한 단계 더 어둡다.
- * 지난 행은 행 자체가 container로 깔리므로 블록은 canvas로 내려간다.
+ * 지난 행은 행 자체가 recessed로 깔리므로 블록은 canvas로 내려간다.
  */
 function blockClass(row) {
   if (dropState(row) === 'blocked') return 'border-text-disabled bg-danger-bg'
@@ -373,7 +373,7 @@ const rowPopoverStyle = computed(() => {
           class="flex h-13 items-start gap-2 border-t border-border-default px-1 py-1 transition-colors duration-150 ease-standard"
           :class="[
             dropState(row) === 'blocked' ? 'opacity-60' : '',
-            isPast(row) && !dropState(row) ? 'bg-surface-container' : '',
+            isPast(row) && !dropState(row) ? 'bg-surface-recessed' : '',
           ]"
         >
           <span class="shrink-0 text-caption" :class="hourClass(row)">{{ row.hour }}</span>
