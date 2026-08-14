@@ -73,6 +73,14 @@ export const patients = [
   P('p-40', '정도현', 63, '남', '동반이환', 완료, '프로세스 종료', null),
 ]
 
+/*
+ * 일정 이벤트는 환자 이름만 들고 있다. 상세로 들어갈 때 원본을 찾는다.
+ * 동명이인이 생기면 이름이 아니라 id를 이벤트에 심어야 한다 — 확인 필요.
+ */
+export function findPatientByName(name) {
+  return patients.find((p) => p.name === name) ?? null
+}
+
 /* 연령 구간. 분석 차트의 x축이다 */
 export function ageBucket(age) {
   if (age < 10) return '10대 미만'

@@ -230,6 +230,7 @@ function reset() {
           :key="row.patient.id"
           class="flex h-14 w-full items-center gap-2.5 px-0.5 py-1 text-left active:rounded-lg active:bg-surface-pressed"
           :class="i > 0 ? 'border-t border-border-default' : ''"
+          @click="router.push({ path: `/patients/detail/${row.patient.id}` })"
         >
           <span class="flex h-11 w-[245px] shrink-0 flex-col justify-center gap-0.5">
             <span class="truncate text-title-sm font-semibold text-text-primary">

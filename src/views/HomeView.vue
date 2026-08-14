@@ -3,7 +3,9 @@ import { ref, reactive, computed, watch } from 'vue'
 import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, ArrowUpDown, Check, TriangleAlert,
 } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
 import { quickAuthoringItems } from '../mocks/home.js'
+import { findPatientByName } from '../mocks/patients.js'
 import { shiftedKey } from '../mocks/schedule.js'
 import {
   dayOn, canDropOn, isOpenHour, leadEvent, taskState, taskWhen, findTask,
@@ -11,6 +13,8 @@ import {
 import { dragState, startPress, trackPress, cancelDrag } from '../dragState.js'
 import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
 import TaskDetailModal from '../components/TaskDetailModal.vue'
+
+const router = useRouter()
 
 /* 아젠다가 보여주는 창: 오늘 기준 앞뒤 3일 */
 const dayKeys = [-3, -2, -1, 0, 1, 2, 3].map((offset) => shiftedKey(offset))
@@ -179,8 +183,12 @@ function openRow(row, event) {
     openTask(findTask(only.taskId))
     return
   }
-  /* 환자 일정은 환자 화면으로 간다 — 그 화면을 만들 때 연결한다 */
-  if (only) return
+  /* 환자 일정은 환자 상세로 간다. 이벤트는 이름만 들고 있어 원본을 찾는다 */
+  if (only) {
+    const found = findPatientByName(only.title)
+    if (found) router.push({ path: `/patients/detail/${found.id}` })
+    return
+  }
   /*
    * 지난 시간은 왜 안 되는지 말해준다. 아무 반응이 없으면
    * 고장으로 읽힌다 — 비활성은 이유와 함께 와야 한다.

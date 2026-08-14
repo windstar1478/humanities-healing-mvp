@@ -16,6 +16,12 @@ export default createRouter({
       component: () => import('./views/PatientListView.vue'),
       meta: { fullWidth: true },
     },
+    /* 상세도 리스트와 같이 본문 전폭을 쓴다 (Figma 130:3152) */
+    {
+      path: '/patients/detail/:id',
+      component: () => import('./views/PatientDetailView.vue'),
+      meta: { fullWidth: true },
+    },
     { path: '/effectiveness', component: () => import('./views/EffectivenessView.vue') },
     { path: '/authoring',     component: () => import('./views/AuthoringView.vue') },
   ],

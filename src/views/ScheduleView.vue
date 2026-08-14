@@ -3,12 +3,16 @@ import { ref, computed } from 'vue'
 import {
   ChevronLeft, ChevronRight, ChevronRight as Caret, Plus, Check, TriangleAlert,
 } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
 import { calendarMonth } from '../mocks/calendar.js'
+import { findPatientByName } from '../mocks/patients.js'
 import { dayLabel, TODAY_KEY, NOW_HOUR } from '../mocks/schedule.js'
 import { monthCells, canDropOn, findTask } from '../scheduleState.js'
 import { dragState } from '../dragState.js'
 import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
 import TaskDetailModal from '../components/TaskDetailModal.vue'
+
+const router = useRouter()
 
 const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일']
 
@@ -96,9 +100,14 @@ const popoverStyle = computed(() => {
 const detailTask = ref(null)
 
 function openEvent(event) {
-  if (!event.taskId) return
   popover.value = null
-  detailTask.value = findTask(event.taskId)
+  if (event.taskId) {
+    detailTask.value = findTask(event.taskId)
+    return
+  }
+  /* 환자 일정은 환자 상세로 간다. 이벤트는 이름만 들고 있어 원본을 찾는다 */
+  const found = findPatientByName(event.title)
+  if (found) router.push({ path: `/patients/detail/${found.id}` })
 }
 
 /* 지난 일정은 명도를 낮춘다 — 아젠다와 같은 규칙 */
@@ -253,8 +262,7 @@ function isPastEvent(key, hour) {
           </div>
 
           <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-            <component
-              :is="event.taskId ? 'button' : 'div'"
+            <button
               v-for="(event, i) in popover.cell.events"
               :key="i"
               class="flex min-h-11 w-full items-center gap-2 py-1 text-left"
@@ -286,9 +294,9 @@ function isPastEvent(key, hour) {
                   {{ event.meta }}
                 </span>
               </span>
-              <!-- 환자는 환자 화면으로, 업무는 작업 상세로 들어간다 -->
-              <Caret v-if="event.bar || event.taskId" :size="16" class="shrink-0 text-text-secondary" />
-            </component>
+              <!-- 환자는 환자 상세로, 업무는 작업 상세로 들어간다 -->
+              <Caret :size="16" class="shrink-0 text-text-secondary" />
+            </button>
           </div>
         </div>
       </div>
