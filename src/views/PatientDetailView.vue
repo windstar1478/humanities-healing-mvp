@@ -9,7 +9,7 @@ import { patients } from '../mocks/patients.js'
 import {
   PROCESS_STEPS, stepIndexOf, SESSION_TOTAL, SESSION_CURRENT,
   processHistory, CURRENT_VERSION,
-  keyMetrics, metricPoints, metricSeries, metricScale,
+  keyMetrics, metricPoints, metricSeries, SCALE_SPAN, SCALE_STEPS,
 } from '../mocks/process.js'
 
 /*
@@ -64,14 +64,29 @@ const activeMetric = computed(() => keyMetrics.find((m) => m.id === selectedMetr
 const series = computed(() => metricSeries[selectedMetric.value] ?? [])
 
 const PLOT = { width: 1000, height: 200 }
-const scaleTop = metricScale[0]
-const scaleBottom = metricScale[metricScale.length - 1]
+
+/*
+ * 눈금은 데이터를 가운데 두고 20 폭으로 잡는다.
+ * 지표마다 값의 범위가 달라 하나로 고정하면(우울 55~75) 감정 통제감 38이 밖으로 나간다.
+ * 이 규칙으로 우울·불안은 Figma와 같은 55~75가 나온다.
+ */
+const metricScale = computed(() => {
+  const values = series.value
+  if (!values.length) return []
+  const middle = (Math.min(...values) + Math.max(...values)) / 2
+  const step = SCALE_SPAN / SCALE_STEPS
+  const bottom = Math.round((middle - SCALE_SPAN / 2) / step) * step
+  return Array.from({ length: SCALE_STEPS + 1 }, (_, i) => bottom + SCALE_SPAN - i * step)
+})
+
+const scaleTop = computed(() => metricScale.value[0] ?? 0)
+const scaleBottom = computed(() => metricScale.value[metricScale.value.length - 1] ?? 0)
 
 /* 열 중앙에 점을 찍는다. x축 라벨과 같은 칸을 쓴다 */
 const columnWidth = PLOT.width / metricPoints.length
 const xAt = (index) => columnWidth * (index + 0.5)
 const yAt = (value) =>
-  ((scaleTop - value) / (scaleTop - scaleBottom)) * PLOT.height
+  ((scaleTop.value - value) / (scaleTop.value - scaleBottom.value)) * PLOT.height
 
 const linePath = computed(() =>
   series.value.map((v, i) => `${i ? 'L' : 'M'}${xAt(i)},${yAt(v)}`).join(' '),

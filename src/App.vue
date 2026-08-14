@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   ClipboardList, CalendarDays, Users, TrendingUp, PenTool,
   Bell, Settings, Sun, Moon,
@@ -31,6 +31,16 @@ const navGroups = [
 const route = useRoute()
 function isCurrent(to) {
   return to === '/' ? route.path === '/' : route.path.startsWith(to)
+}
+
+/*
+ * 패널의 환자도 탭과 꾹 누르기를 모두 받는다.
+ * 탭 = 환자 상세, 꾹 누르기 = 배치. 배치로 끝난 제스처의 click은
+ * swallowDragClick이 삼키므로 여기서는 신경 쓰지 않는다.
+ */
+const router = useRouter()
+function openPatient(patient) {
+  router.push({ path: `/patients/detail/${patient.id}` })
 }
 
 const isDark = ref(false)
@@ -130,14 +140,14 @@ onUnmounted(() => {
     <!-- 좌우 패딩은 화면마다 다르다. 분석은 36, 전체 리스트는 24 -->
     <main
       class="flex flex-1 gap-2 overflow-y-auto rounded-2xl bg-surface-container"
-      :class="$route.meta.fullWidth ? 'px-6' : 'px-9'"
+      :class="$route.meta.noPatientPanel ? 'px-6' : 'px-9'"
     >
       <RouterView />
     </main>
 
     <!-- 우: 환자 패널. 전체 환자 리스트 화면은 이 패널을 쓰지 않는다 -->
     <aside
-      v-if="!$route.meta.fullWidth"
+      v-if="!$route.meta.noPatientPanel"
       class="flex w-[274px] shrink-0 flex-col gap-1 overflow-y-auto rounded-2xl bg-surface-container px-6 py-4"
     >
       <!-- 검색 -->
@@ -158,6 +168,7 @@ onUnmounted(() => {
           @pointermove="trackPress"
           @pointercancel="cancelDrag"
           @contextmenu.prevent
+          @click="openPatient(p)"
         >
           <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
             <User :size="24" />
@@ -193,6 +204,7 @@ onUnmounted(() => {
           @pointermove="trackPress"
           @pointercancel="cancelDrag"
           @contextmenu.prevent
+          @click="openPatient(p)"
         >
           <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
             <User :size="24" />
