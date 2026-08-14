@@ -125,7 +125,7 @@ const textClass = (picked) => (picked ? 'text-text-primary' : 'text-text-seconda
   <div class="flex flex-1 flex-col justify-center gap-2 py-4">
     <!-- 필터 결과 수. 누르면 그 조건 그대로 전체 환자 리스트로 간다 -->
     <button
-      class="flex shrink-0 items-center gap-3 rounded-lg border border-border-default bg-surface-card py-4 pl-8 pr-3 text-left active:bg-surface-card-pressed"
+      class="flex shrink-0 items-center gap-3 rounded-lg border border-border-default bg-surface-card py-4 pl-8 pr-3 text-left active:bg-surface-pressed"
       @click="openList"
     >
       <span class="flex min-w-0 flex-1 flex-col">
@@ -182,7 +182,7 @@ const textClass = (picked) => (picked ? 'text-text-primary' : 'text-text-seconda
         <button
           v-for="row in series[dimension.id]"
           :key="row.key"
-          class="flex h-11 items-center justify-center gap-3 rounded-lg text-left active:bg-surface-card-pressed"
+          class="flex h-11 items-center justify-center gap-3 rounded-lg text-left active:bg-surface-pressed"
           @click="toggle(dimension.id, row.key)"
         >
           <span
@@ -225,7 +225,7 @@ const textClass = (picked) => (picked ? 'text-text-primary' : 'text-text-seconda
           <button
             v-for="row in series.age"
             :key="row.key"
-            class="flex w-11 shrink-0 flex-col items-center justify-center gap-1 rounded-lg p-1 active:bg-surface-card-pressed"
+            class="flex w-11 shrink-0 flex-col items-center justify-center gap-1 rounded-lg p-1 active:bg-surface-pressed"
             @click="toggle('age', row.key)"
           >
             <span class="text-center text-label font-medium" :class="textClass(row.picked)">

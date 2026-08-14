@@ -62,9 +62,16 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
     어느 쪽이든 card·container·recessed·canvas 넷 모두와 다른 값이라 항상 보인다
   - **선택된 자리는 `active:bg-selected-bg-pressed`**로 눌러 accent를 잃지 않는다
   - **드래그 중에는 넣지 않는다.** 드롭 상태(active·blocked) 표현과 겹친다
-  - 아젠다는 **행과 블록에 함께** 건다. 눌린 동안 행 전체가 한 색으로 눌린다 —
-    지난 행의 블록은 canvas(#EEF0F3)가 pressed와 같은 값이라 블록만으로는 변화가 없다
+  - 아젠다는 **행과 블록에 함께** 건다. 눌린 동안 행 전체가 눌린 것으로 보인다
+  - **지난 시간의 블록만 `active:bg-surface-pressed-strong`을 쓴다.**
+    평소가 canvas인데 라이트에서 canvas와 pressed가 `#EEF0F3`로 값이 같아
+    pressed로는 아무 변화가 없다. 반 단계 더 내려(`neutral-150` = `#E8EAEE`)
+    누른 것이 보이게 하고, 눌린 행(pressed)보다 어둡게 유지해 표면 계단을 지킨다.
+    다크에서는 `neutral-850`이 그 자리다
+  - **채워진 버튼은 `active:bg-surface-inverse-pressed`.** 확정 버튼이 여기 해당한다
   - 텍스트만 있는 버튼은 배경 대신 `active:text-text-primary`로 눌린다
+  - 카드 위의 요소도 `surface-pressed`를 쓴다. `surface-card-pressed`는 카드와
+    한 단계밖에 차이가 없어 눌린 것이 거의 보이지 않는다
 - **네비게이션 문법**: 탭 = 탐색(상태 불변), 버튼 = 결정(상태 변경)
 - **오버레이**: 무거운 콘텐츠 → 대형 모달 + 뒤로가기 전용 dismiss / 가벼운 콘텐츠 → 팝오버 + 외부 탭 dismiss
 - **스테퍼 노드 글리프는 상태만 표시**: 완료=체크, 진행중=accent fill, 대기=빈 점선 원. **순서 숫자 사용 금지**
@@ -206,7 +213,8 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 
 - **Layer 1 Primitives** (`--color-neutral-*`, `--color-brand-*` 등): 화면 코드에서 **직접 사용 금지**
   - Figma 스케일에 없는 값이 필요하면 **구간의 중간값을 새 primitive로** 만든다.
-    `neutral-850`(다크 카드) · `neutral-75`/`neutral-925`(지난 시간 띠)가 그 예다.
+    `neutral-850`(다크 카드) · `neutral-75`/`neutral-925`(지난 시간 띠) ·
+    `neutral-150`(지난 시간 블록의 pressed)이 그 예다.
     화면 코드에 임의 값을 적지 않기 위한 것이므로 반드시 Semantic 토큰을 하나 붙일 것
 - **Layer 2 Semantic** (`bg-surface-card`, `text-text-primary`, `border-border-subtle` 등): 화면 코드는 이것만 사용
 - **다크모드**: `.dark`에서 Semantic만 재매핑. 화면 코드에 `dark:` 유틸리티를 쓰지 말 것

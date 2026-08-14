@@ -67,7 +67,7 @@ function toggleDone() {
 
     <template #actions="{ dismiss }">
       <button class="flex h-11 items-center" @click="dismiss">
-        <span class="flex h-9 items-center rounded-lg border border-border-default px-3 text-body">
+        <span class="flex h-9 items-center rounded-lg border border-border-default px-3 text-body active:bg-surface-pressed">
           닫기
         </span>
       </button>
@@ -75,8 +75,8 @@ function toggleDone() {
         <span
           class="flex h-9 items-center rounded-lg px-3 text-body"
           :class="task.done
-            ? 'border border-border-default text-text-primary'
-            : 'bg-surface-inverse text-text-inverse'"
+            ? 'border border-border-default text-text-primary active:bg-surface-pressed'
+            : 'bg-surface-inverse text-text-inverse active:bg-surface-inverse-pressed'"
         >
           {{ task.done ? '완료 취소' : '완료' }}
         </span>

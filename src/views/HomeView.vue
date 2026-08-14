@@ -130,6 +130,16 @@ function pressClass(row) {
 }
 
 /*
+ * 지난 행의 블록은 평소가 canvas라 pressed와 값이 같다 — 눌러도 변화가 없다.
+ * 반 단계 더 내려서 누른 것이 보이게 하고, 눌린 행보다 어둡게 유지해 계단을 지킨다.
+ */
+function blockPressClass(row) {
+  if (dragState.item) return ''
+  if (isSelected(row)) return 'active:bg-selected-bg-pressed'
+  return isPast(row) ? 'active:bg-surface-pressed-strong' : 'active:bg-surface-pressed'
+}
+
+/*
  * 일정 블록은 행 배경보다 한 단계 더 어둡다.
  * 지난 행은 행 자체가 recessed로 깔리므로 블록은 canvas로 내려간다.
  */
@@ -241,7 +251,7 @@ const rowPopoverStyle = computed(() => {
           <button
             v-for="item in quickAuthoringItems"
             :key="item.id"
-            class="flex h-15 flex-col items-center justify-center gap-1 rounded-lg border border-border-default p-2 text-label font-medium text-text-primary active:bg-surface-card-pressed"
+            class="flex h-15 flex-col items-center justify-center gap-1 rounded-lg border border-border-default p-2 text-label font-medium text-text-primary active:bg-surface-pressed"
           >
             <component :is="item.icon" :size="24" class="shrink-0" />
             <span>{{ item.label }}</span>
@@ -255,7 +265,7 @@ const rowPopoverStyle = computed(() => {
           <h2 class="text-title-sm font-semibold">작업 · {{ openCount }}</h2>
           <div class="flex-1"></div>
           <button
-            class="flex size-11 shrink-0 items-center justify-center rounded-lg text-text-secondary active:bg-surface-card-pressed"
+            class="flex size-11 shrink-0 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed"
             @click="sortOpen = !sortOpen"
           >
             <ArrowUpDown :size="16" />
@@ -314,8 +324,8 @@ const rowPopoverStyle = computed(() => {
               >
                 <!-- 완료된 작업은 배치 대상이 아니다. 탭으로 되돌리기만 한다 -->
                 <button
-                  class="flex h-12 w-full touch-manipulation select-none flex-col justify-center gap-0.5 rounded-lg p-2 text-left transition-colors duration-100 ease-standard active:bg-surface-card-pressed"
-                  :class="dragState.item?.id === task.id ? 'bg-surface-card-pressed' : ''"
+                  class="flex h-12 w-full touch-manipulation select-none flex-col justify-center gap-0.5 rounded-lg p-2 text-left transition-colors duration-100 ease-standard active:bg-surface-pressed"
+                  :class="dragState.item?.id === task.id ? 'bg-surface-pressed' : ''"
                   @pointerdown="section.draggable && startPress($event, task, 'task')"
                   @pointermove="trackPress"
                   @pointercancel="cancelDrag"
@@ -406,7 +416,7 @@ const rowPopoverStyle = computed(() => {
             v-if="row.events.length"
             :data-drop-hour="dropState(row) === 'active' ? row.hour : null"
             class="flex min-h-11 flex-1 items-center gap-3 overflow-hidden rounded-lg border pr-3 text-left transition-colors duration-150 ease-standard"
-            :class="[blockClass(row), pressClass(row), isFaded(row) ? 'opacity-40' : '']"
+            :class="[blockClass(row), blockPressClass(row), isFaded(row) ? 'opacity-40' : '']"
             @click="openRow(row, $event)"
           >
             <!-- 바는 항상 자리를 차지한다. 미표시일 때만 투명 처리해 텍스트 정렬을 유지 -->
@@ -461,7 +471,7 @@ const rowPopoverStyle = computed(() => {
               dropState(row) === 'active' ? 'border-dashed border-border-selected bg-selected-bg' : '',
               dropState(row) === 'blocked' ? 'border-text-disabled bg-danger-bg' : '',
               !dropState(row) ? 'border-transparent' : '',
-              pressClass(row),
+              blockPressClass(row),
               isFaded(row) ? 'opacity-40' : '',
             ]"
             @click="openRow(row, $event)"

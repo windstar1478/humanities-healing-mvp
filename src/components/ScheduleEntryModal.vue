@@ -280,8 +280,8 @@ watch(() => form.date, () => {
             <span
               class="flex h-9 items-center rounded-lg border px-3 text-label"
               :class="form.subjectKind === opt.k
-                ? 'border-border-selected bg-selected-bg text-text-primary'
-                : 'border-border-default text-text-secondary'"
+                ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
+                : 'border-border-default text-text-secondary active:bg-surface-pressed'"
             >
               {{ opt.label }}
             </span>
@@ -314,7 +314,7 @@ watch(() => form.date, () => {
                   class="flex h-12 w-full items-center justify-between gap-2 px-3 text-left"
                   :class="[
                     i > 0 ? 'border-t border-border-subtle' : '',
-                    form.patient?.id === p.id ? 'bg-selected-bg' : '',
+                    form.patient?.id === p.id ? 'bg-selected-bg active:bg-selected-bg-pressed' : 'active:bg-surface-pressed',
                   ]"
                   @click="pickPatient(p)"
                 >
@@ -368,8 +368,8 @@ watch(() => form.date, () => {
             <span
               class="flex h-9 items-center rounded-lg border px-3 text-label"
               :class="visitType === type
-                ? 'border-border-selected bg-selected-bg text-text-primary'
-                : 'border-border-default text-text-secondary'"
+                ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
+                : 'border-border-default text-text-secondary active:bg-surface-pressed'"
             >
               {{ type }}
             </span>
@@ -391,8 +391,8 @@ watch(() => form.date, () => {
             <span
               class="flex h-9 items-center rounded-lg border px-3 text-label"
               :class="form.date === UNSET
-                ? 'border-border-selected bg-selected-bg text-text-primary'
-                : 'border-border-default text-text-secondary'"
+                ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
+                : 'border-border-default text-text-secondary active:bg-surface-pressed'"
             >
               미정
             </span>
@@ -406,8 +406,8 @@ watch(() => form.date, () => {
             <span
               class="flex h-9 items-center rounded-lg border px-3 text-label"
               :class="form.date === key
-                ? 'border-border-selected bg-selected-bg text-text-primary'
-                : 'border-border-default text-text-secondary'"
+                ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
+                : 'border-border-default text-text-secondary active:bg-surface-pressed'"
             >
               {{ shortDayLabel(key) }}
             </span>
@@ -428,8 +428,8 @@ watch(() => form.date, () => {
             <span
               class="flex h-9 items-center rounded-lg border px-3 text-label"
               :class="form.hour === UNSET
-                ? 'border-border-selected bg-selected-bg text-text-primary'
-                : 'border-border-default text-text-secondary'"
+                ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
+                : 'border-border-default text-text-secondary active:bg-surface-pressed'"
             >
               미정
             </span>
@@ -443,8 +443,8 @@ watch(() => form.date, () => {
             <span
               class="flex h-9 items-center rounded-lg border px-3 text-label"
               :class="form.hour === hour
-                ? 'border-border-selected bg-selected-bg text-text-primary'
-                : 'border-border-default text-text-secondary'"
+                ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
+                : 'border-border-default text-text-secondary active:bg-surface-pressed'"
             >
               {{ hour }}
             </span>
@@ -457,14 +457,14 @@ watch(() => form.date, () => {
     <template #actions>
       <!-- 중복 경고의 취소는 모달을 닫지 않는다. 고르던 자리로 되돌린다 -->
       <button class="flex h-11 items-center" @click="duplicate ? (duplicate = null) : dismiss()">
-        <span class="flex h-9 items-center rounded-lg border border-border-default px-3 text-body">
+        <span class="flex h-9 items-center rounded-lg border border-border-default px-3 text-body active:bg-surface-pressed">
           {{ duplicate ? '돌아가기' : '취소' }}
         </span>
       </button>
       <button class="flex h-11 items-center" :disabled="!canConfirm" @click="confirm">
         <span
           class="flex h-9 items-center rounded-lg px-3 text-body"
-          :class="canConfirm ? 'bg-surface-inverse text-text-inverse' : 'bg-surface-field text-text-disabled'"
+          :class="canConfirm ? 'bg-surface-inverse text-text-inverse active:bg-surface-inverse-pressed' : 'bg-surface-field text-text-disabled'"
         >
           {{ duplicate ? '그래도 배치' : asTask ? '추가' : '배치' }}
         </span>
