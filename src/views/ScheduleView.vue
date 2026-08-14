@@ -175,6 +175,15 @@ function isPastEvent(key, hour) {
                 : popover?.cell.key === cell.key && !popover.warning
                   ? 'bg-selected-bg ring-2 ring-inset ring-border-selected'
                   : 'bg-surface-container',
+            /*
+             * 누르는 동안의 피드백. 드래그 중에는 넣지 않는다 —
+             * 드롭 상태 표현과 겹친다
+             */
+            dragState.item
+              ? ''
+              : popover?.cell.key === cell.key && !popover.warning
+                ? 'active:bg-selected-bg-pressed'
+                : 'active:bg-surface-pressed',
           ]"
           @click="openDay(cell, $event)"
         >
@@ -265,7 +274,7 @@ function isPastEvent(key, hour) {
             <button
               v-for="(event, i) in popover.cell.events"
               :key="i"
-              class="flex min-h-11 w-full items-center gap-2 py-1 text-left"
+              class="flex min-h-11 w-full items-center gap-2 py-1 text-left active:bg-surface-pressed"
               :class="i > 0 ? 'border-t border-border-subtle' : ''"
               @click="openEvent(event)"
             >

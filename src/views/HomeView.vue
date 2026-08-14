@@ -117,6 +117,19 @@ function isSelected(row) {
 }
 
 /*
+ * 누르는 동안의 피드백.
+ * 행 전체가 surface-pressed 한 색으로 눌린다 — 라이트에서는 어두워지고
+ * 다크에서는 밝아지지만, 어느 쪽이든 평소 표면(카드·container·recessed·canvas)과
+ * 확실히 다른 값이라 뭘 누르고 있는지 보인다.
+ * 선택된 자리는 selected-bg-pressed로 눌러 accent를 잃지 않는다.
+ * 드래그 중에는 넣지 않는다 — 드롭 상태 표현과 겹친다.
+ */
+function pressClass(row) {
+  if (dragState.item) return ''
+  return isSelected(row) ? 'active:bg-selected-bg-pressed' : 'active:bg-surface-pressed'
+}
+
+/*
  * 일정 블록은 행 배경보다 한 단계 더 어둡다.
  * 지난 행은 행 자체가 recessed로 깔리므로 블록은 canvas로 내려간다.
  */
@@ -268,7 +281,9 @@ const rowPopoverStyle = computed(() => {
             class="flex h-11 w-full items-center justify-between gap-2 px-3 text-left text-label"
             :class="[
               i > 0 ? 'border-t border-border-subtle' : '',
-              sortKey === opt.key ? 'bg-selected-bg' : '',
+              sortKey === opt.key
+                ? 'bg-selected-bg active:bg-selected-bg-pressed'
+                : 'active:bg-surface-pressed',
             ]"
             @click="sortKey = opt.key; sortOpen = false"
           >
@@ -382,6 +397,7 @@ const rowPopoverStyle = computed(() => {
           :class="[
             dropState(row) === 'blocked' ? 'opacity-60' : '',
             isPast(row) && !dropState(row) ? 'bg-surface-recessed' : '',
+            pressClass(row),
           ]"
         >
           <span class="shrink-0 text-caption" :class="hourClass(row)">{{ row.hour }}</span>
@@ -390,7 +406,7 @@ const rowPopoverStyle = computed(() => {
             v-if="row.events.length"
             :data-drop-hour="dropState(row) === 'active' ? row.hour : null"
             class="flex min-h-11 flex-1 items-center gap-3 overflow-hidden rounded-lg border pr-3 text-left transition-colors duration-150 ease-standard"
-            :class="[blockClass(row), isFaded(row) ? 'opacity-40' : '']"
+            :class="[blockClass(row), pressClass(row), isFaded(row) ? 'opacity-40' : '']"
             @click="openRow(row, $event)"
           >
             <!-- 바는 항상 자리를 차지한다. 미표시일 때만 투명 처리해 텍스트 정렬을 유지 -->
@@ -445,6 +461,7 @@ const rowPopoverStyle = computed(() => {
               dropState(row) === 'active' ? 'border-dashed border-border-selected bg-selected-bg' : '',
               dropState(row) === 'blocked' ? 'border-text-disabled bg-danger-bg' : '',
               !dropState(row) ? 'border-transparent' : '',
+              pressClass(row),
               isFaded(row) ? 'opacity-40' : '',
             ]"
             @click="openRow(row, $event)"
@@ -492,7 +509,7 @@ const rowPopoverStyle = computed(() => {
             <button
               v-for="(event, i) in rowPopover.row.events"
               :key="i"
-              class="flex min-h-11 w-full items-center gap-2 py-1 text-left"
+              class="flex min-h-11 w-full items-center gap-2 py-1 text-left active:bg-surface-pressed"
               :class="i > 0 ? 'border-t border-border-subtle' : ''"
               @click="event.taskId && openTask(findTask(event.taskId))"
             >
