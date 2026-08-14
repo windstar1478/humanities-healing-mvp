@@ -220,11 +220,15 @@ function reset() {
         <span class="min-w-0 flex-1">다음 일정</span>
       </div>
 
+      <!--
+        행에 라운드를 주면 border-t 구분선 끝이 휘어 표의 가로선이 끊겨 보인다.
+        눌렀을 때만 둥글어진다 (Figma의 pressed 변형)
+      -->
       <div class="min-h-0 flex-1 overflow-y-auto">
         <button
           v-for="(row, i) in rows"
           :key="row.patient.id"
-          class="flex h-14 w-full items-center gap-2.5 rounded-lg px-0.5 py-1 text-left active:bg-surface-pressed"
+          class="flex h-14 w-full items-center gap-2.5 px-0.5 py-1 text-left active:rounded-lg active:bg-surface-pressed"
           :class="i > 0 ? 'border-t border-border-default' : ''"
         >
           <span class="flex h-11 w-[245px] shrink-0 flex-col justify-center gap-0.5">
