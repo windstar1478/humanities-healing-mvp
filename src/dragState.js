@@ -30,6 +30,29 @@ export const PRESS_MOVE_TOLERANCE = 10
 let pressTimer = null
 let pressOrigin = null
 
+/*
+ * 꾹 눌러 배치한 직후에도 pointerup 뒤에 click이 한 번 더 온다.
+ * 같은 행이 탭(상세 열기)과 꾹 누르기(배치)를 둘 다 받으므로,
+ * 배치로 끝난 제스처의 click은 여기서 한 번 삼킨다.
+ */
+let swallowNextClick = false
+
+/*
+ * 손을 뗀 자리가 누른 자리와 다르면 click이 아예 오지 않는다.
+ * 그때 플래그가 남으면 그 다음 탭을 엉뚱하게 삼키므로,
+ * 새 제스처가 시작될 때 반드시 푼다.
+ */
+export function beginGesture() {
+  swallowNextClick = false
+}
+
+export function swallowDragClick(event) {
+  if (!swallowNextClick) return
+  swallowNextClick = false
+  event.stopPropagation()
+  event.preventDefault()
+}
+
 function clearPress() {
   if (pressTimer) clearTimeout(pressTimer)
   pressTimer = null
@@ -91,6 +114,7 @@ export function trackDrag(event) {
 export function endPress(event) {
   clearPress()
   if (dragState.item) {
+    swallowNextClick = true
     const live = Number.isFinite(event?.clientX)
       ? targetUnder(event.clientX, event.clientY)
       : { hour: dragState.hoverHour, date: dragState.hoverDate }

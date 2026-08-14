@@ -8,6 +8,7 @@ import {
 import { recentPatients, allPatients } from './mocks/patients.js'
 import {
   dragState, startPress, trackPress, trackDrag, endPress, cancelDrag,
+  swallowDragClick, beginGesture,
 } from './dragState.js'
 
 const navGroups = [
@@ -30,14 +31,19 @@ function setTheme(dark) {
 
 /* 꾹 누르기 로직은 dragState에 있다. 셸에서 window 리스너만 한 번 건다 */
 onMounted(() => {
+  window.addEventListener('pointerdown', beginGesture, true)
   window.addEventListener('pointerup', endPress)
   window.addEventListener('pointercancel', cancelDrag)
   window.addEventListener('pointermove', trackDrag)
+  /* 배치로 끝난 제스처의 click을 삼킨다. 캡처 단계라야 행에 닿기 전에 잡는다 */
+  window.addEventListener('click', swallowDragClick, true)
 })
 onUnmounted(() => {
+  window.removeEventListener('pointerdown', beginGesture, true)
   window.removeEventListener('pointerup', endPress)
   window.removeEventListener('pointercancel', cancelDrag)
   window.removeEventListener('pointermove', trackDrag)
+  window.removeEventListener('click', swallowDragClick, true)
   cancelDrag()
 })
 </script>

@@ -1,18 +1,21 @@
-﻿<script setup>
-import { ref, computed, watch } from 'vue'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next'
+<script setup>
+import { ref, reactive, computed, watch } from 'vue'
+import {
+  ChevronLeft, ChevronRight, ChevronDown, Plus, ArrowUpDown, Check, TriangleAlert,
+} from 'lucide-vue-next'
 import { quickAuthoringItems } from '../mocks/home.js'
 import { shiftedKey } from '../mocks/schedule.js'
-import { dayOn, canDropOn, taskState } from '../scheduleState.js'
+import {
+  dayOn, canDropOn, isOpenHour, leadEvent, taskState, taskWhen, findTask,
+} from '../scheduleState.js'
 import { dragState, startPress, trackPress, cancelDrag } from '../dragState.js'
 import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
+import TaskDetailModal from '../components/TaskDetailModal.vue'
 
 /* 아젠다가 보여주는 창: 오늘 기준 앞뒤 3일 */
 const dayKeys = [-3, -2, -1, 0, 1, 2, 3].map((offset) => shiftedKey(offset))
-/* 미배정 할 일도 공용 상태다. 캘린더에서 만든 미정 업무가 여기 들어온다 */
-const tasks = computed(() => taskState.items)
 /* 업무는 다른 날로 옮겨 잡을 수 있어야 하므로 배치 가능한 날을 모두 넘긴다 */
-const openDates = computed(() => dayKeys.filter((key) => canDropOn(key)))
+const openDates = computed(() => dayKeys.filter((key) => canDropOn(key, 'task')))
 
 const dayIndex = ref(3)
 /* 일정은 공용 상태에서 온다. 화면이 사본을 들면 캘린더와 갈라진다 */
@@ -24,16 +27,68 @@ function goDay(step) {
   if (next >= 0 && next < dayKeys.length) dayIndex.value = next
 }
 
-/* 지난 일정만 명도를 낮춘다. 진행 중은 accent 배지로 구분한다 */
-const isPast = (row) => row.state === 'past'
+/* ── 작업 목록 ────────────────────────────────────────────────────
+ * 배치해도 목록에서 사라지지 않는다. 리마인더로 남고 완료로만 내려간다.
+ * 그래서 배치 여부로 구간을 나눈다 — 미배정 / 배정됨 / 완료.
+ */
+const SORTS = [
+  { key: 'time', label: '시간 빠른 순' },
+  { key: 'added', label: '추가한 순' },
+]
+const sortKey = ref('time')
+const sortOpen = ref(false)
+/* 완료만 접어 둔다. 지난 일이라 평소에는 볼 일이 없다 */
+const sectionOpen = reactive({ unassigned: true, assigned: true, done: false })
 
 /*
- * 환자를 집어 든 동안에만 드롭 상태를 계산한다.
- * 일정이 이미 있거나 지난 시간이면 놓을 수 없다.
+ * 시간까지 넣어 비교한다. 같은 날 안에서는 이른 시간이 먼저다.
+ * 날짜 미정은 맨 뒤로 보낸다 — 정할 것이 없어 급하지 않다.
+ */
+const sortStamp = (task) => `${task.date} ${task.hour ?? ''}`
+
+function bySort(list) {
+  if (sortKey.value === 'added') return list
+  return [...list].sort((a, b) => {
+    if (!a.date && !b.date) return 0
+    if (!a.date) return 1
+    if (!b.date) return -1
+    const [x, y] = [sortStamp(a), sortStamp(b)]
+    return x === y ? 0 : (x < y ? -1 : 1)
+  })
+}
+
+/* 시간까지 정해져야 배정된 것이다. 날짜만 있으면 타임라인에 자리가 없다 */
+const sections = computed(() => {
+  const open = taskState.items.filter((t) => !t.done)
+  return [
+    { key: 'unassigned', label: '미배정', items: bySort(open.filter((t) => !t.hour)), draggable: true },
+    { key: 'assigned', label: '배정됨', items: bySort(open.filter((t) => t.hour)), draggable: true },
+    { key: 'done', label: '완료', items: bySort(taskState.items.filter((t) => t.done)), draggable: false },
+  ]
+})
+
+const openCount = computed(() => taskState.items.filter((t) => !t.done).length)
+
+/* ── 타임라인 ─────────────────────────────────────────────────────
+ * 지난 행은 행 전체를 어둡게 깔아 지금 시각의 경계를 드러낸다.
+ *
+ * opacity가 아니라 배경 토큰을 쓴다. opacity는 글자까지 같이 씻어내서
+ * 실측 대비가 제목 4.44 / 메타 2.99(AA 미달)까지 떨어졌다.
+ * 배경만 바꾸면 글자는 온전한 토큰 대비를 유지한다.
+ */
+const isPast = (row) => row.state === 'past'
+
+/* 대표 한 건과 접힌 수. 캘린더 셀과 같은 문법이다 */
+const lead = (row) => leadEvent(row.events)
+const overflow = (row) => Math.max(0, row.events.length - 1)
+
+/*
+ * 집어 든 동안에만 드롭 상태를 계산한다.
+ * 작업은 다른 작업 위에 겹칠 수 있고, 환자 일정은 빈 행에만 놓을 수 있다.
  */
 function dropState(row) {
   if (!dragState.item) return null
-  return row.event || isPast(row) ? 'blocked' : 'active'
+  return isOpenHour(row, dragState.itemKind) ? 'active' : 'blocked'
 }
 
 /*
@@ -48,29 +103,110 @@ function hourClass(row) {
   if (dropState(row) === 'active') {
     return isFaded(row) ? 'text-text-secondary' : 'text-text-primary'
   }
-  return isPast(row) ? 'text-text-disabled' : 'text-text-secondary'
+  return 'text-text-secondary'
 }
 
+/* 목록 팝오버가 열린 행은 선택 상태다 — 캘린더 선택 칸과 같은 문법 */
+function isSelected(row) {
+  const open = rowPopover.value
+  return Boolean(open && !open.warning && open.row.hour === row.hour)
+}
+
+/*
+ * 일정 블록은 행 배경보다 한 단계 더 어둡다.
+ * 지난 행은 행 자체가 container로 깔리므로 블록은 canvas로 내려간다.
+ */
+function blockClass(row) {
+  if (dropState(row) === 'blocked') return 'border-text-disabled bg-danger-bg'
+  if (dropState(row) === 'active') return 'border-dashed border-border-selected bg-selected-bg'
+  if (isSelected(row)) return 'border-transparent bg-selected-bg ring-2 ring-inset ring-border-selected'
+  return isPast(row) ? 'border-transparent bg-surface-canvas' : 'border-transparent bg-surface-container'
+}
 
 /* ── 모달 ────────────────────────────────────────────────────────
- * 배치 확인 · 일정 추가 · 할 일 추가는 ScheduleEntryModal 하나가 담당한다.
+ * 배치 확인 · 일정 추가 · 작업 추가는 ScheduleEntryModal 하나가 담당한다.
  * 규칙(중복 경고 · nextStep 검증)이 화면마다 갈라지지 않게 하기 위함이다.
  */
 const modal = ref(null)
+/* 빈 행을 눌러 열면 그 시간이 기본값이 된다 */
+const addHour = ref(null)
+const detailTask = ref(null)
 
 watch(
   () => dragState.pending,
   (pending) => { if (pending) modal.value = 'drop' },
 )
 
-function openAdd(kind) {
+function openAdd(kind, hour = null) {
+  addHour.value = hour
   modal.value = kind
 }
 
 function closeModal() {
   modal.value = null
+  addHour.value = null
   dragState.pending = null
 }
+
+/*
+ * 행 탭과 꾹 누르기는 같은 요소가 받는다.
+ * 배치로 끝난 제스처의 click은 dragState가 삼키므로 여기서는 신경 쓰지 않는다.
+ */
+function openTask(task) {
+  rowPopover.value = null
+  detailTask.value = task
+}
+
+/*
+ * 여러 건이 접힌 행은 목록부터 연다. 가벼운 콘텐츠라 모달이 아니라 팝오버다 —
+ * 캘린더 날짜 팝오버와 같은 문법이고 history entry를 만들지 않는다.
+ */
+const rowPopover = ref(null)
+
+function anchorOf(event) {
+  const r = event.currentTarget.getBoundingClientRect()
+  return { left: r.left, top: r.top, height: r.height }
+}
+
+function openRow(row, event) {
+  if (row.events.length > 1) {
+    rowPopover.value = { row, anchor: anchorOf(event) }
+    return
+  }
+  const only = row.events[0]
+  if (only?.taskId) {
+    /* 타임라인 블록은 작업에서 파생한 사본이다. 원본을 찾아 연다 */
+    openTask(findTask(only.taskId))
+    return
+  }
+  /* 환자 일정은 환자 화면으로 간다 — 그 화면을 만들 때 연결한다 */
+  if (only) return
+  /*
+   * 지난 시간은 왜 안 되는지 말해준다. 아무 반응이 없으면
+   * 고장으로 읽힌다 — 비활성은 이유와 함께 와야 한다.
+   */
+  if (isPast(row)) {
+    rowPopover.value = { row, anchor: anchorOf(event), warning: '지난 시간에는 일정을 추가할 수 없습니다' }
+    return
+  }
+  openAdd('add-event', row.hour)
+}
+
+/* 행 왼쪽에 붙인다. 세로는 행 중앙에 맞추되 화면 밖으로 나가지 않게 가둔다 */
+const rowPopoverStyle = computed(() => {
+  if (!rowPopover.value) return {}
+  const WIDTH = 280
+  const HEIGHT = rowPopover.value.warning ? 72 : 300
+  const GAP = 8
+  const MARGIN = 24
+  const { left, top, height } = rowPopover.value.anchor
+  const wanted = top + height / 2 - HEIGHT / 2
+  return {
+    left: `${Math.max(MARGIN, left - WIDTH - GAP)}px`,
+    top: `${Math.min(Math.max(MARGIN, wanted), window.innerHeight - HEIGHT - MARGIN)}px`,
+    width: `${WIDTH}px`,
+  }
+})
 </script>
 
 <template>
@@ -92,42 +228,104 @@ function closeModal() {
         </div>
       </section>
 
-      <!-- 미배정 -->
-      <section class="flex min-h-0 flex-1 flex-col rounded-lg border border-border-default bg-surface-card px-3 py-2">
-        <div class="flex h-11 shrink-0 items-center justify-between">
-          <h2 class="text-title-sm font-semibold">미배정 · {{ tasks.length }}</h2>
+      <!-- 작업 -->
+      <section class="relative flex min-h-0 flex-1 flex-col rounded-lg border border-border-default bg-surface-card px-3 py-2">
+        <div class="flex h-11 shrink-0 items-center">
+          <h2 class="text-title-sm font-semibold">작업 · {{ openCount }}</h2>
+          <div class="flex-1"></div>
           <button
-            class="flex h-11 items-center gap-1 pl-2 text-label font-medium text-text-secondary active:text-text-primary"
+            class="flex size-11 shrink-0 items-center justify-center rounded-lg text-text-secondary active:bg-surface-card-pressed"
+            @click="sortOpen = !sortOpen"
+          >
+            <ArrowUpDown :size="16" />
+          </button>
+          <button
+            class="flex h-11 shrink-0 items-center gap-1 pl-1 text-label font-medium text-text-secondary active:text-text-primary"
             @click="openAdd('add-task')"
           >
             <Plus :size="16" class="shrink-0" />
-            <span>할 일 추가</span>
+            <span>작업 추가</span>
           </button>
         </div>
 
-        <ul class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-          <li
-            v-for="task in tasks"
-            :key="task.id"
-            class="flex h-13 shrink-0 flex-col justify-center border-t border-border-default"
+        <!-- 정렬 기준. 가벼운 콘텐츠라 팝오버 + 외부 탭 dismiss다 -->
+        <div v-if="sortOpen" class="fixed inset-0 z-40" @click="sortOpen = false"></div>
+        <div
+          v-if="sortOpen"
+          class="absolute right-3 top-12 z-40 w-36 overflow-hidden rounded-lg border border-border-default bg-surface-card"
+        >
+          <button
+            v-for="(opt, i) in SORTS"
+            :key="opt.key"
+            class="flex h-11 w-full items-center justify-between gap-2 px-3 text-left text-label"
+            :class="[
+              i > 0 ? 'border-t border-border-subtle' : '',
+              sortKey === opt.key ? 'bg-selected-bg' : '',
+            ]"
+            @click="sortKey = opt.key; sortOpen = false"
           >
+            <span>{{ opt.label }}</span>
+            <Check v-if="sortKey === opt.key" :size="16" class="shrink-0 text-text-secondary" />
+          </button>
+        </div>
+
+        <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <template v-for="section in sections" :key="section.key">
             <button
-              class="flex h-12 w-full touch-manipulation select-none flex-col justify-center gap-0.5 rounded-lg p-2 text-left transition-colors duration-100 ease-standard active:bg-surface-card-pressed"
-              :class="dragState.item?.id === task.id ? 'bg-surface-card-pressed' : ''"
-              @pointerdown="startPress($event, task, 'task')"
-              @pointermove="trackPress"
-              @pointercancel="cancelDrag"
-              @contextmenu.prevent
+              class="flex h-11 shrink-0 items-center gap-1 border-t border-border-default pl-1 text-label font-medium text-text-secondary active:text-text-primary"
+              @click="sectionOpen[section.key] = !sectionOpen[section.key]"
             >
-              <span class="truncate text-body text-text-primary">{{ task.title }}</span>
-              <span v-if="task.category || task.due" class="truncate text-caption text-text-secondary">
-                <template v-if="task.category">{{ task.category }}</template>
-                <template v-if="task.category && task.due"> · </template>
-                <span v-if="task.due" :class="task.overdue ? 'text-indicator-warning' : ''">{{ task.due }}</span>
-              </span>
+              <component
+                :is="sectionOpen[section.key] ? ChevronDown : ChevronRight"
+                :size="16"
+                class="shrink-0"
+              />
+              <span>{{ section.label }} · {{ section.items.length }}</span>
             </button>
-          </li>
-        </ul>
+
+            <ul v-if="sectionOpen[section.key]" class="flex shrink-0 flex-col gap-2 pb-2">
+              <li
+                v-for="task in section.items"
+                :key="task.id"
+                class="flex h-13 shrink-0 flex-col justify-center border-t border-border-subtle"
+              >
+                <!-- 완료된 작업은 배치 대상이 아니다. 탭으로 되돌리기만 한다 -->
+                <button
+                  class="flex h-12 w-full touch-manipulation select-none flex-col justify-center gap-0.5 rounded-lg p-2 text-left transition-colors duration-100 ease-standard active:bg-surface-card-pressed"
+                  :class="dragState.item?.id === task.id ? 'bg-surface-card-pressed' : ''"
+                  @pointerdown="section.draggable && startPress($event, task, 'task')"
+                  @pointermove="trackPress"
+                  @pointercancel="cancelDrag"
+                  @contextmenu.prevent
+                  @click="openTask(task)"
+                >
+                  <span class="flex items-center gap-1">
+                    <Check v-if="task.done" :size="16" class="shrink-0 text-text-secondary" />
+                    <span
+                      class="truncate text-body"
+                      :class="task.done ? 'text-text-secondary' : 'text-text-primary'"
+                    >
+                      {{ task.title }}
+                    </span>
+                  </span>
+                  <span v-if="task.category || taskWhen(task)" class="truncate text-caption text-text-secondary">
+                    <template v-if="task.category">{{ task.category }}</template>
+                    <template v-if="task.category && taskWhen(task)"> · </template>
+                    <span
+                      v-if="taskWhen(task)"
+                      :class="taskWhen(task).overdue ? 'text-indicator-warning' : ''"
+                    >
+                      {{ taskWhen(task).text }}
+                    </span>
+                  </span>
+                </button>
+              </li>
+              <li v-if="!section.items.length" class="px-2 py-2 text-label text-text-disabled">
+                없음
+              </li>
+            </ul>
+          </template>
+        </div>
       </section>
     </div>
 
@@ -172,53 +370,66 @@ function closeModal() {
         <div
           v-for="row in rows"
           :key="row.hour"
-          class="flex h-13 items-start gap-2 border-t border-border-default py-1 transition-opacity duration-150 ease-standard"
-          :class="dropState(row) === 'blocked' ? 'opacity-60' : ''"
+          class="flex h-13 items-start gap-2 border-t border-border-default px-1 py-1 transition-colors duration-150 ease-standard"
+          :class="[
+            dropState(row) === 'blocked' ? 'opacity-60' : '',
+            isPast(row) && !dropState(row) ? 'bg-surface-container' : '',
+          ]"
         >
           <span class="shrink-0 text-caption" :class="hourClass(row)">{{ row.hour }}</span>
 
           <button
-            v-if="row.event"
+            v-if="row.events.length"
+            :data-drop-hour="dropState(row) === 'active' ? row.hour : null"
             class="flex min-h-11 flex-1 items-center gap-3 overflow-hidden rounded-lg border pr-3 text-left transition-colors duration-150 ease-standard"
-            :class="dropState(row) === 'blocked'
-              ? 'border-text-disabled bg-danger-bg'
-              : 'border-transparent bg-surface-container'"
+            :class="[blockClass(row), isFaded(row) ? 'opacity-40' : '']"
+            @click="openRow(row, $event)"
           >
             <!-- 바는 항상 자리를 차지한다. 미표시일 때만 투명 처리해 텍스트 정렬을 유지 -->
             <span
-              class="w-2 shrink-0 self-stretch"
-              :class="!row.event.bar
-                ? 'invisible'
-                : (isPast(row) || dropState(row) === 'blocked'
-                  ? 'bg-border-default'
-                  : 'bg-border-strong')"
+              class="w-2 shrink-0 self-stretch transition-colors duration-150 ease-standard"
+              :class="dropState(row) === 'active'
+                ? 'bg-border-selected'
+                : (!lead(row).bar
+                  ? 'invisible'
+                  : (dropState(row) === 'blocked' ? 'bg-border-default' : 'bg-border-strong'))"
             ></span>
 
             <span class="flex min-w-0 flex-1 flex-col gap-1">
               <span
                 class="truncate text-title-sm font-semibold"
-                :class="isPast(row) || dropState(row) === 'blocked'
+                :class="isPast(row) || lead(row).done || dropState(row) === 'blocked'
                   ? 'text-text-secondary'
                   : 'text-text-primary'"
               >
-                {{ row.event.title }}
+                {{ lead(row).title }}
               </span>
               <!-- 지난 일정 메타도 secondary. Figma는 disabled이지만 13px 본문 대비가 3.02로 낮아 격상 -->
-              <span v-if="row.event.meta" class="truncate text-label font-medium text-text-secondary">
-                {{ row.event.meta }}
+              <span v-if="lead(row).meta" class="truncate text-label font-medium text-text-secondary">
+                {{ lead(row).meta }}
               </span>
             </span>
 
-            <span v-if="row.event.badge" class="shrink-0 text-caption font-bold text-interactive-default">
-              {{ row.event.badge }}
+            <!-- 접힌 건수. 캘린더 셀과 같은 문법이다 -->
+            <span v-if="overflow(row)" class="shrink-0 text-count text-text-secondary">
+              +{{ overflow(row) }}
+            </span>
+            <!-- 완료는 개선 표현이므로 중립색 체크로 둔다 -->
+            <Check v-if="lead(row).done" :size="16" class="shrink-0 text-text-secondary" />
+            <span
+              v-else-if="lead(row).badge"
+              class="shrink-0 text-caption font-bold text-interactive-default"
+            >
+              {{ lead(row).badge }}
             </span>
           </button>
 
           <!--
             빈 행의 블록은 항상 렌더한다. v-if로 새로 붙이면 전환 없이 즉시 나타나
-            일정이 있는 행(색 전환 150ms)보다 빨라 보인다
+            일정이 있는 행(색 전환 150ms)보다 빨라 보인다.
+            지난 시간에는 넣을 것이 없으므로 누를 수 없다 — 드롭 규칙과 같다.
           -->
-          <div
+          <button
             v-else
             :data-drop-hour="dropState(row) === 'active' ? row.hour : null"
             class="flex min-h-11 flex-1 items-center overflow-hidden rounded-lg border transition duration-150 ease-standard"
@@ -228,23 +439,92 @@ function closeModal() {
               !dropState(row) ? 'border-transparent' : '',
               isFaded(row) ? 'opacity-40' : '',
             ]"
+            @click="openRow(row, $event)"
           >
             <span
               class="w-2 shrink-0 self-stretch transition duration-150 ease-standard"
               :class="dropState(row) === 'active' ? 'bg-border-selected' : 'bg-transparent'"
             ></span>
-          </div>
+          </button>
         </div>
       </div>
     </section>
+
+    <!-- 한 시간에 여러 건이 있을 때. 캘린더 날짜 팝오버와 같은 문법이다 -->
+    <Teleport to="body">
+      <div v-if="rowPopover" class="fixed inset-0 z-50" @click="rowPopover = null">
+        <!--
+          비활성 사유 콜아웃. 아무 반응이 없으면 고장으로 읽힌다.
+          Figma 176:5079(주황 테두리 + ⚠)를 아직 열지 않아 초안이다.
+        -->
+        <div
+          v-if="rowPopover.warning"
+          class="absolute flex items-center gap-2 rounded-2xl border border-warning-fg bg-surface-card px-3 py-3"
+          :style="rowPopoverStyle"
+          @click.stop
+        >
+          <TriangleAlert :size="16" class="shrink-0 text-warning-fg" />
+          <span class="text-label text-text-primary">{{ rowPopover.warning }}</span>
+        </div>
+
+        <div
+          v-else
+          class="absolute flex max-h-[300px] flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card"
+          :style="rowPopoverStyle"
+          @click.stop
+        >
+          <div class="flex h-11 shrink-0 items-center gap-2 px-3 pt-3">
+            <span class="text-title-sm font-semibold">{{ rowPopover.row.hour }}</span>
+            <span class="flex-1"></span>
+            <span class="shrink-0 text-count text-text-secondary">
+              {{ rowPopover.row.events.length }}건
+            </span>
+          </div>
+          <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+            <button
+              v-for="(event, i) in rowPopover.row.events"
+              :key="i"
+              class="flex min-h-11 w-full items-center gap-2 py-1 text-left"
+              :class="i > 0 ? 'border-t border-border-subtle' : ''"
+              @click="event.taskId && openTask(findTask(event.taskId))"
+            >
+              <Check
+                v-if="event.done"
+                :size="16"
+                class="shrink-0 text-text-secondary"
+              />
+              <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span
+                  class="truncate text-body font-medium"
+                  :class="event.done ? 'text-text-secondary' : 'text-text-primary'"
+                >
+                  {{ event.title }}
+                </span>
+                <span v-if="event.meta" class="truncate text-caption text-text-secondary">
+                  {{ event.meta }}
+                </span>
+              </span>
+              <ChevronRight :size="16" class="shrink-0 text-text-secondary" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <ScheduleEntryModal
       v-if="modal"
       :mode="modal"
       :date-key="day.key"
+      :hour-key="addHour"
       :date-options="openDates"
       :drop="dragState.pending"
       @close="closeModal"
+    />
+
+    <TaskDetailModal
+      v-if="detailTask"
+      :task="detailTask"
+      @close="detailTask = null"
     />
   </div>
 </template>

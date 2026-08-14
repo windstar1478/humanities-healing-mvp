@@ -1,5 +1,8 @@
 /*
- * 일정 단일 저장소. 아젠다(홈)와 캘린더(일정)가 모두 여기를 본다.
+ * 환자 일정 저장소. 아젠다(홈)와 캘린더(일정)가 모두 여기를 본다.
+ *
+ * 업무는 여기 없다. 업무는 작업(mocks/tasks.js)이 날짜·시간을 가진 상태이고,
+ * 타임라인 블록은 거기서 파생한다. 완료 상태가 두 곳에 생기지 않게 하기 위함이다.
  *
  * 어느 날 누가 있는지는 Figma 일정 화면(86:1243)의 7월 캘린더에서 가져왔다.
  * 월 뷰에는 시각이 없고 셀당 두 건까지만 보이므로, 시간대와 접혀 있던 건들은
@@ -13,11 +16,10 @@ export const NOW_HOUR = '13:00'
 
 const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
-/* 환자 일정만 bar: true. 업무는 좌측 바가 없다 */
+/* 환자 일정만 bar: true. 업무(작업에서 파생)는 좌측 바가 없다 */
 const P = (hour, title, condition, step) => ({
   hour, title, meta: `${condition} · ${step}`, bar: true, badge: null,
 })
-const W = (hour, title, meta = null) => ({ hour, title, meta, bar: false, badge: null })
 
 export const eventsByDate = {
   '2026-07-01': [
@@ -28,9 +30,7 @@ export const eventsByDate = {
   '2026-07-06': [
     P('09:00', '나예솔', 'PTSD', '프로그램 수행'),
     P('11:00', '김철수', '게임과몰입', '프로세스 시작'),
-    W('16:00', '주간 보고서 정리', '보고'),
   ],
-  '2026-07-08': [W('10:00', '데이터 검수 확인', '저작도구')],
   '2026-07-13': [
     P('10:00', '조민서', '게임과몰입', '프로그램 수행'),
     P('15:00', '정유나', 'PTSD', '감정평가 (사전)'),
@@ -38,14 +38,12 @@ export const eventsByDate = {
   '2026-07-17': [
     P('09:00', '이준호', '게임과몰입', '프로그램 수행'),
     P('11:00', '나예솔', 'PTSD', '프로그램 수행'),
-    W('14:00', '문항 검수 회의', '협업'),
     P('16:00', '서지원', '게임과몰입', '감정평가 (사후)'),
   ],
   '2026-07-21': [
     P('10:00', '서지원', '게임과몰입', '프로그램 수행'),
     P('14:00', '조민서', '게임과몰입', '감정평가 (사전)'),
   ],
-  '2026-07-23': [W('13:00', '연구실 정기 회의', '협업')],
   '2026-07-27': [
     P('09:00', '김서준', '게임과몰입', '프로세스 시작'),
     P('14:00', '이준호', '게임과몰입', '감정평가 (사전)'),
@@ -54,13 +52,10 @@ export const eventsByDate = {
   '2026-07-29': [
     P('09:00', '김서준', '게임과몰입', '감정평가'),
     { hour: '10:00', title: '나예솔', meta: 'PTSD · 프로그램 수행 (5/8)', bar: true, badge: null },
-    { hour: '13:00', title: '인문학 강사 미팅', meta: '운영팀', bar: false, badge: '진행 중' },
     P('14:00', '서지원', '게임과몰입', '프로세스 종료'),
-    W('16:00', '3주차 보고서 초안'),
     P('17:00', '조민서', '게임과몰입', '프로그램 처방'),
   ],
   '2026-07-31': [
-    W('10:00', '월말 결산', '보고'),
     P('14:00', '정유나', 'PTSD', '프로그램 수행'),
     P('15:00', '조민서', '게임과몰입', '프로세스 종료'),
   ],
@@ -77,33 +72,31 @@ export function shortDayLabel(key) {
   return `${m}/${d} (${WEEKDAY_LABELS[new Date(y, m - 1, d).getDay()]})`
 }
 
+/* 오늘 기준 며칠 차이인지. 지난 날은 음수 */
+export function daysFrom(key) {
+  const [y, m, d] = key.split('-').map(Number)
+  const [ty, tm, td] = TODAY_KEY.split('-').map(Number)
+  return Math.round((new Date(y, m - 1, d) - new Date(ty, tm - 1, td)) / 86400000)
+}
+
+/*
+ * 목록에 쓰는 날짜 라벨.
+ * 어제·오늘·내일만 상대 표기로 줄이고 나머지는 절대 표기를 쓴다.
+ * D-3 형태는 자리는 아끼지만 날짜를 다시 계산해야 읽히고,
+ * 지난 건이 D+1이 되어 부호가 헷갈린다.
+ */
+export function relativeDayLabel(key) {
+  const diff = daysFrom(key)
+  if (diff === -1) return '어제'
+  if (diff === 0) return '오늘'
+  if (diff === 1) return '내일'
+  return shortDayLabel(key)
+}
+
 export function dayLabel(key) {
   const [y, m, d] = key.split('-').map(Number)
   const weekday = WEEKDAY_LABELS[new Date(y, m - 1, d).getDay()]
   return `${m}월 ${d}일 (${weekday})`
-}
-
-/* 오늘 기준으로 지난 시간인지 */
-function hourState(key, hour) {
-  if (key < TODAY_KEY) return 'past'
-  if (key > TODAY_KEY) return 'upcoming'
-  if (hour < NOW_HOUR) return 'past'
-  return hour === NOW_HOUR ? 'current' : 'upcoming'
-}
-
-/* 하루치 타임라인 행을 만든다. 아젠다가 쓰는 형태 */
-export function buildDay(key) {
-  const events = eventsByDate[key] ?? []
-  return {
-    key,
-    label: dayLabel(key),
-    isToday: key === TODAY_KEY,
-    rows: HOURS.map((hour) => ({
-      hour,
-      state: hourState(key, hour),
-      event: events.find((e) => e.hour === hour) ?? null,
-    })),
-  }
 }
 
 /* 오늘 기준 앞뒤 offset일의 날짜 키 */

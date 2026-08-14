@@ -1,11 +1,14 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { ChevronLeft, ChevronRight, ChevronRight as Caret, Plus } from 'lucide-vue-next'
+import {
+  ChevronLeft, ChevronRight, ChevronRight as Caret, Plus, Check, TriangleAlert,
+} from 'lucide-vue-next'
 import { calendarMonth } from '../mocks/calendar.js'
 import { dayLabel, TODAY_KEY, NOW_HOUR } from '../mocks/schedule.js'
-import { monthCells, canDropOn } from '../scheduleState.js'
+import { monthCells, canDropOn, findTask } from '../scheduleState.js'
 import { dragState } from '../dragState.js'
 import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
+import TaskDetailModal from '../components/TaskDetailModal.vue'
 
 const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일']
 
@@ -30,7 +33,8 @@ const openDates = computed(() => cells.value.filter((c) => canDropOn(c.key)).map
  */
 function dropState(cell) {
   if (!dragState.item) return null
-  return canDropOn(cell.key) ? 'active' : 'blocked'
+  /* 작업은 다른 작업 위에 겹칠 수 있어 놓을 수 있는 날이 더 많다 */
+  return canDropOn(cell.key, dragState.itemKind) ? 'active' : 'blocked'
 }
 
 function isFaded(cell) {
@@ -48,25 +52,30 @@ const overflowCount = (events) => Math.max(0, events.length - 2)
 const popover = ref(null)
 
 function openDay(cell, event) {
+  const r = event.currentTarget.getBoundingClientRect()
+  const anchor = { right: r.right, top: r.top, height: r.height }
   /*
    * 빈 칸은 열 팝오버가 없다. 대신 그 날짜로 일정 추가를 연다.
-   * 배치할 수 없는 날(지난 날)은 추가할 것도 없으므로 아무 일도 하지 않는다.
+   * 놓을 수 없는 날이면 왜 안 되는지 말해준다 —
+   * 아무 반응이 없으면 고장으로 읽힌다.
    */
   if (!cell.events.length) {
-    if (!canDropOn(cell.key)) return
+    if (!canDropOn(cell.key)) {
+      popover.value = { cell, anchor, warning: '지난 날짜에는 일정을 추가할 수 없습니다' }
+      return
+    }
     addOnKey.value = cell.key
     addOpen.value = true
     return
   }
-  const r = event.currentTarget.getBoundingClientRect()
-  popover.value = { cell, anchor: { right: r.right, top: r.top, height: r.height } }
+  popover.value = { cell, anchor }
 }
 
 /* 칸 오른쪽에 붙이고 세로는 칸 중앙에 맞춘다. 화면 밖으로는 나가지 않는다 */
 const popoverStyle = computed(() => {
   if (!popover.value) return {}
   const WIDTH = 280
-  const HEIGHT = 364
+  const HEIGHT = popover.value.warning ? 72 : 364
   const GAP = 8
   const MARGIN = 24
   const { right, top, height } = popover.value.anchor
@@ -79,6 +88,18 @@ const popoverStyle = computed(() => {
     width: `${WIDTH}px`,
   }
 })
+
+/*
+ * 팝오버의 업무 행도 작업 상세로 들어간다 — 아젠다 행과 같은 문법이다.
+ * 팝오버는 먼저 닫는다. 모달만 history 엔트리를 갖게 하기 위함이다.
+ */
+const detailTask = ref(null)
+
+function openEvent(event) {
+  if (!event.taskId) return
+  popover.value = null
+  detailTask.value = findTask(event.taskId)
+}
 
 /* 지난 일정은 명도를 낮춘다 — 아젠다와 같은 규칙 */
 function isPastEvent(key, hour) {
@@ -142,7 +163,7 @@ function isPastEvent(key, hour) {
               ? 'bg-selected-bg ring-2 ring-inset ring-border-selected'
               : dropState(cell) === 'blocked'
                 ? 'bg-danger-bg opacity-60 ring-1 ring-inset ring-text-disabled'
-                : popover?.cell.key === cell.key
+                : popover?.cell.key === cell.key && !popover.warning
                   ? 'bg-selected-bg ring-2 ring-inset ring-border-selected'
                   : 'bg-surface-container',
           ]"
@@ -196,7 +217,21 @@ function isPastEvent(key, hour) {
     -->
     <Teleport to="body">
       <div v-if="popover" class="fixed inset-0 z-50" @click="popover = null">
+        <!--
+          비활성 사유 콜아웃. Figma 176:5079(주황 테두리 + ⚠)를 아직 열지 않아 초안이다.
+        -->
         <div
+          v-if="popover.warning"
+          class="absolute flex items-center gap-2 rounded-2xl border border-warning-fg bg-surface-card px-3 py-3"
+          :style="popoverStyle"
+          @click.stop
+        >
+          <TriangleAlert :size="16" class="shrink-0 text-warning-fg" />
+          <span class="text-label text-text-primary">{{ popover.warning }}</span>
+        </div>
+
+        <div
+          v-else
           class="absolute flex max-h-[364px] flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card"
           :style="popoverStyle"
           @click.stop
@@ -218,11 +253,13 @@ function isPastEvent(key, hour) {
           </div>
 
           <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-            <div
+            <component
+              :is="event.taskId ? 'button' : 'div'"
               v-for="(event, i) in popover.cell.events"
               :key="i"
-              class="flex min-h-11 items-center gap-2 py-1"
+              class="flex min-h-11 w-full items-center gap-2 py-1 text-left"
               :class="i > 0 ? 'border-t border-border-subtle' : ''"
+              @click="openEvent(event)"
             >
               <span
                 class="w-10 shrink-0 text-caption"
@@ -237,18 +274,21 @@ function isPastEvent(key, hour) {
               ></span>
               <span class="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span
-                  class="truncate text-body font-medium"
-                  :class="isPastEvent(popover.cell.key, event.hour) ? 'text-text-secondary' : 'text-text-primary'"
+                  class="flex items-center gap-1 truncate text-body font-medium"
+                  :class="isPastEvent(popover.cell.key, event.hour) || event.done
+                    ? 'text-text-secondary'
+                    : 'text-text-primary'"
                 >
-                  {{ event.title }}
+                  <Check v-if="event.done" :size="16" class="shrink-0" />
+                  <span class="truncate">{{ event.title }}</span>
                 </span>
                 <span v-if="event.meta" class="truncate text-caption text-text-secondary">
                   {{ event.meta }}
                 </span>
               </span>
-              <!-- 환자 일정만 상세로 들어간다 -->
-              <Caret v-if="event.bar" :size="16" class="shrink-0 text-text-secondary" />
-            </div>
+              <!-- 환자는 환자 화면으로, 업무는 작업 상세로 들어간다 -->
+              <Caret v-if="event.bar || event.taskId" :size="16" class="shrink-0 text-text-secondary" />
+            </component>
           </div>
         </div>
       </div>
@@ -269,6 +309,12 @@ function isPastEvent(key, hour) {
       :date-key="dragState.pending.dateKey"
       :drop="dragState.pending"
       @close="dragState.pending = null"
+    />
+
+    <TaskDetailModal
+      v-if="detailTask"
+      :task="detailTask"
+      @close="detailTask = null"
     />
   </div>
 </template>
