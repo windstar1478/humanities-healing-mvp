@@ -5,7 +5,7 @@ import { Search } from 'lucide-vue-next'
 import { GENERAL, PROCESS } from '../mocks/home.js'
 import { recentPatients, allPatients } from '../mocks/patients.js'
 import { dayLabel, shortDayLabel } from '../mocks/schedule.js'
-import { openHoursOn, duplicateOn, addEvent } from '../scheduleState.js'
+import { openHoursOn, duplicateOn, addEvent, addTask } from '../scheduleState.js'
 
 /*
  * 배치 확인 · 일정 추가 · 할 일 추가가 쓰는 공용 모달.
@@ -24,30 +24,80 @@ const props = defineProps({
   drop: { type: Object, default: null },
 })
 
-const emit = defineEmits(['close', 'placed', 'added-task'])
+const emit = defineEmits(['close', 'placed'])
+
+/* 날짜·시간을 '미정'으로 고른 상태. 업무에서만 고를 수 있다 */
+const UNSET = 'unset'
 
 /* 신규 환자 등록은 이 모달의 일이 아니다. 기존 환자 중에서만 고른다 */
 const patientOptions = [...recentPatients, ...allPatients].filter(
   (p, i, arr) => arr.findIndex((q) => q.name === p.name) === i,
 )
 
-const form = reactive({ subjectKind: 'patient', patient: null, query: '', title: '', category: '', date: null, hour: null })
+/*
+ * date는 여기서 초기화한다. onMounted에서 넣으면 아래 date 워처가 뒤늦게 돌아
+ * 기본 시간까지 같이 지운다.
+ */
+const form = reactive({
+  subjectKind: 'patient',
+  patient: null,
+  query: '',
+  title: '',
+  category: '',
+  date: props.dateKey ?? null,
+  hour: null,
+})
 
-/* 날짜가 넘어왔으면 그것을, 아니면 모달에서 고른 날짜를 쓴다 */
-const activeDate = computed(() => props.dateKey ?? form.date)
-const needsDate = computed(() => !props.dateKey && props.mode !== 'add-task')
 const duplicate = ref(null)
 const visitType = ref(PROCESS)
+
+/*
+ * 업무는 언제 할지 정하지 않은 채로 만들 수 있다. 환자 일정은 그럴 수 없다 —
+ * 환자를 만나는 일에는 반드시 날짜와 시간이 있다.
+ */
+const isWork = computed(() => props.mode === 'add-event' && form.subjectKind === 'work')
+
+/*
+ * 날짜가 넘어왔으면 보통 그대로 쓴다. 업무만은 넘어왔더라도 '미정'으로
+ * 되돌릴 수 있어야 하므로 선택 구간을 계속 보여준다.
+ */
+const needsDate = computed(() => props.mode === 'add-event' && (!props.dateKey || isWork.value))
+const dateChoices = computed(() => {
+  if (props.dateOptions.length) return props.dateOptions
+  return props.dateKey ? [props.dateKey] : []
+})
+
+const activeDate = computed(() => {
+  if (!needsDate.value) return props.dateKey ?? null
+  return form.date === UNSET ? null : form.date
+})
 
 const openHours = computed(() => (activeDate.value ? openHoursOn(activeDate.value) : []))
 
 /* 캘린더는 날짜 칸에 놓으므로 시간이 정해지지 않은 채로 온다 */
-const needsHour = computed(() => props.mode === 'add-event' || (props.mode === 'drop' && !props.drop?.hour))
+const needsHour = computed(() =>
+  props.mode === 'drop' ? !props.drop?.hour : props.mode === 'add-event',
+)
 
-const patientResults = computed(() => {
+/* 날짜든 시간이든 미정이면 일정이 아니라 미배정 할 일이 된다 */
+const asTask = computed(() => isWork.value && (form.date === UNSET || form.hour === UNSET))
+
+/*
+ * 우측 환자 패널과 같은 구조 — 최근 환자 다음에 전체 환자가 이어진다.
+ * 검색 중에는 두 구간을 합쳐 한 덩어리로 보여준다.
+ */
+const patientGroups = computed(() => {
   const q = form.query.trim()
-  if (!q) return recentPatients
-  return patientOptions.filter((p) => p.name.includes(q) || p.condition.includes(q))
+  if (q) {
+    return [{
+      label: '검색 결과',
+      items: patientOptions.filter((p) => p.name.includes(q) || p.condition.includes(q)),
+    }]
+  }
+  return [
+    { label: '최근 환자', items: recentPatients },
+    { label: '전체 환자', items: allPatients },
+  ]
 })
 
 /* 드롭이든 추가든 환자면 같은 규칙을 탄다 */
@@ -63,7 +113,8 @@ const patientRuleOk = computed(() => visitType.value === GENERAL || Boolean(next
 const canConfirm = computed(() => {
   if (props.mode === 'add-task') return form.title.trim().length > 0
   if (needsDate.value && !form.date) return false
-  if (needsHour.value && !form.hour) return false
+  /* 날짜가 미정이면 고를 시간 자체가 없다 */
+  if (needsHour.value && activeDate.value && !form.hour) return false
   if (props.mode === 'add-event') {
     return form.subjectKind === 'patient'
       ? Boolean(form.patient) && patientRuleOk.value
@@ -107,12 +158,14 @@ function buildEvent(hour) {
 }
 
 function confirm() {
-  if (props.mode === 'add-task') {
-    emit('added-task', {
+  /* 미정이 하나라도 있으면 타임라인에 그릴 자리가 없다. 미배정 할 일로 보낸다 */
+  if (props.mode === 'add-task' || asTask.value) {
+    addTask({
       id: `task-${Date.now()}`,
       title: form.title.trim(),
       category: form.category.trim() || null,
-      due: null,
+      /* 날짜만 정해진 업무는 그 날짜를 할 일의 기한 자리에 남긴다 */
+      due: asTask.value && form.date !== UNSET ? shortDayLabel(form.date) : null,
       overdue: false,
     })
     dismiss()
@@ -167,7 +220,12 @@ onMounted(() => {
   }
 })
 
-watch(() => form.subjectKind, () => { duplicate.value = null })
+/* 환자로 되돌아오면 '미정'은 고를 수 없는 값이 된다. 원래 날짜로 되돌린다 */
+watch(() => form.subjectKind, () => {
+  duplicate.value = null
+  if (form.date === UNSET) form.date = props.dateKey ?? null
+  if (form.hour === UNSET) form.hour = null
+})
 
 /* 날짜가 바뀌면 그 날의 빈 시간이 달라지므로 시간 선택을 비운다 */
 watch(() => form.date, () => {
@@ -242,27 +300,33 @@ watch(() => form.date, () => {
                     class="min-w-0 flex-1 bg-transparent text-body text-text-primary placeholder:text-text-disabled"
                   />
                 </div>
-                <!-- 리스트는 컨테이너 하나로 묶고 행은 구분선으로만 나눈다 -->
-                <p class="mt-2 text-count text-text-secondary">
-                  {{ form.query.trim() ? '검색 결과' : '최근' }}
-                </p>
-                <div class="mt-1 max-h-36 overflow-y-auto rounded-lg border border-border-default">
-                  <button
-                    v-for="(p, i) in patientResults"
-                    :key="p.id"
-                    class="flex h-12 w-full items-center justify-between gap-2 px-3 text-left"
-                    :class="[
-                      i > 0 ? 'border-t border-border-subtle' : '',
-                      form.patient?.name === p.name ? 'bg-selected-bg' : '',
-                    ]"
-                    @click="pickPatient(p)"
-                  >
-                    <span class="truncate text-body">{{ p.name }}</span>
-                    <span class="shrink-0 text-caption text-text-secondary">{{ p.condition }}</span>
-                  </button>
-                  <p v-if="!patientResults.length" class="px-3 py-3 text-label text-text-secondary">
-                    검색 결과가 없습니다
-                  </p>
+                <!--
+                  우측 환자 패널과 같은 구조: 최근 환자 다음에 전체 환자가 이어지고
+                  스크롤로 내려간다. 리스트는 구간마다 컨테이너 하나로 묶고
+                  행은 라운드 없이 구분선으로만 나눈다.
+                -->
+                <div class="mt-2 flex max-h-48 flex-col gap-2 overflow-y-auto">
+                  <div v-for="group in patientGroups" :key="group.label">
+                    <p class="text-count text-text-secondary">{{ group.label }}</p>
+                    <div class="mt-1 rounded-lg border border-border-default">
+                      <button
+                        v-for="(p, i) in group.items"
+                        :key="p.id"
+                        class="flex h-12 w-full items-center justify-between gap-2 px-3 text-left"
+                        :class="[
+                          i > 0 ? 'border-t border-border-subtle' : '',
+                          form.patient?.id === p.id ? 'bg-selected-bg' : '',
+                        ]"
+                        @click="pickPatient(p)"
+                      >
+                        <span class="truncate text-body">{{ p.name }}</span>
+                        <span class="shrink-0 text-caption text-text-secondary">{{ p.condition }}</span>
+                      </button>
+                      <p v-if="!group.items.length" class="px-3 py-3 text-label text-text-secondary">
+                        검색 결과가 없습니다
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </template>
             </template>
@@ -315,9 +379,20 @@ watch(() => form.date, () => {
             <!-- 캘린더 상단에서 열면 날짜가 정해져 있지 않다. 시간보다 먼저 고른다 -->
             <template v-if="needsDate">
               <p class="mt-4 text-label font-medium text-text-secondary">날짜</p>
-              <div v-if="dateOptions.length" class="-mx-6 mt-2 flex gap-2 overflow-x-auto px-6">
+              <div v-if="dateChoices.length || isWork" class="-mx-6 mt-2 flex gap-2 overflow-x-auto px-6">
+                <!-- 업무만 미정을 고를 수 있다. 맨 앞에 둔다 -->
+                <button v-if="isWork" class="flex h-11 shrink-0 items-center" @click="form.date = UNSET">
+                  <span
+                    class="flex h-9 items-center rounded-lg border px-3 text-label"
+                    :class="form.date === UNSET
+                      ? 'border-border-selected bg-selected-bg text-text-primary'
+                      : 'border-border-default text-text-secondary'"
+                  >
+                    미정
+                  </span>
+                </button>
                 <button
-                  v-for="key in dateOptions"
+                  v-for="key in dateChoices"
                   :key="key"
                   class="flex h-11 shrink-0 items-center"
                   @click="form.date = key"
@@ -333,13 +408,26 @@ watch(() => form.date, () => {
                 </button>
               </div>
               <p v-else class="mt-2 text-label text-text-secondary">배치할 수 있는 날짜가 없습니다</p>
+              <p v-if="asTask" class="mt-2 text-label text-text-secondary">
+                미배정 할 일로 추가됩니다
+              </p>
             </template>
 
             <!-- 시간이 정해지지 않은 경우에만 고른다. 미배정 할 일은 시간을 갖지 않는다 -->
             <template v-if="needsHour && activeDate">
               <p class="mt-4 text-label font-medium text-text-secondary">시간</p>
               <!-- 9칸이 줄바꿈되면 모달이 화면을 넘긴다. 가로 스크롤로 한 줄에 둔다 -->
-              <div v-if="openHours.length" class="-mx-6 mt-2 flex gap-2 overflow-x-auto px-6">
+              <div v-if="openHours.length || isWork" class="-mx-6 mt-2 flex gap-2 overflow-x-auto px-6">
+                <button v-if="isWork" class="flex h-11 shrink-0 items-center" @click="form.hour = UNSET">
+                  <span
+                    class="flex h-9 items-center rounded-lg border px-3 text-label"
+                    :class="form.hour === UNSET
+                      ? 'border-border-selected bg-selected-bg text-text-primary'
+                      : 'border-border-default text-text-secondary'"
+                  >
+                    미정
+                  </span>
+                </button>
                 <button
                   v-for="hour in openHours"
                   :key="hour"
@@ -372,7 +460,7 @@ watch(() => form.date, () => {
               class="flex h-9 items-center rounded-lg px-3 text-body"
               :class="canConfirm ? 'bg-surface-inverse text-text-inverse' : 'bg-surface-field text-text-disabled'"
             >
-              {{ duplicate ? '그래도 배치' : mode === 'add-task' ? '추가' : '배치' }}
+              {{ duplicate ? '그래도 배치' : (mode === 'add-task' || asTask) ? '추가' : '배치' }}
             </span>
           </button>
         </div>

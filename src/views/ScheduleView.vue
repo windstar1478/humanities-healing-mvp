@@ -24,6 +24,9 @@ const openDates = computed(() => cells.value.filter((c) => canDropOn(c.key)).map
 /*
  * 캘린더는 날짜 칸이 드롭 단위다. 빈 시간이 하나도 없거나 지난 날이면 놓을 수 없다.
  * 시간은 확인 모달에서 고른다 — 아젠다와 같은 문법이되 단위만 날짜다.
+ *
+ * 셀의 opacity-40(앞뒤 달)은 dropState가 있을 때 걷어낸다.
+ * 드롭 배경까지 40%로 씻겨 어느 칸이 대상인지 보이지 않기 때문이다.
  */
 function dropState(cell) {
   if (!dragState.item) return null
@@ -45,7 +48,16 @@ const overflowCount = (events) => Math.max(0, events.length - 2)
 const popover = ref(null)
 
 function openDay(cell, event) {
-  if (!cell.events.length) return
+  /*
+   * 빈 칸은 열 팝오버가 없다. 대신 그 날짜로 일정 추가를 연다.
+   * 배치할 수 없는 날(지난 날)은 추가할 것도 없으므로 아무 일도 하지 않는다.
+   */
+  if (!cell.events.length) {
+    if (!canDropOn(cell.key)) return
+    addOnKey.value = cell.key
+    addOpen.value = true
+    return
+  }
   const r = event.currentTarget.getBoundingClientRect()
   popover.value = { cell, anchor: { right: r.right, top: r.top, height: r.height } }
 }
@@ -124,7 +136,7 @@ function isPastEvent(key, hour) {
           :data-drop-date="dropState(cell) === 'active' ? cell.key : null"
           class="flex min-h-0 flex-col gap-1 overflow-hidden p-2 text-left transition duration-150 ease-standard"
           :class="[
-            cell.dimmed ? 'opacity-40' : '',
+            cell.dimmed && !dropState(cell) ? 'opacity-40' : '',
             isFaded(cell) ? 'opacity-40' : '',
             dropState(cell) === 'active'
               ? 'bg-selected-bg ring-2 ring-inset ring-border-selected'

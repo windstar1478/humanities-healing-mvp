@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { eventsByDate, HOURS, TODAY_KEY, NOW_HOUR, dayLabel, toKey } from './mocks/schedule.js'
+import { unassignedTasks } from './mocks/home.js'
 
 /*
  * 일정의 유일한 가변 상태. 목업을 한 번 복사해 두고 모든 화면이 함께 읽고 쓴다.
@@ -10,6 +11,20 @@ export const scheduleState = reactive({
     Object.entries(eventsByDate).map(([key, events]) => [key, events.map((e) => ({ ...e }))]),
   ),
 })
+
+/*
+ * 미배정 할 일. 날짜나 시간이 정해지지 않은 업무가 모이는 곳이다.
+ * 아젠다 타임라인은 시간 키(HOURS) 기준이라 시간 없는 이벤트를 그릴 자리가 없다.
+ * 그래서 '미정' 업무는 일정이 아니라 여기로 간다.
+ * 화면 로컬 상태로 두면 캘린더에서 만든 미정 업무가 홈에 나타나지 않는다.
+ */
+export const taskState = reactive({
+  items: unassignedTasks.map((task) => ({ ...task })),
+})
+
+export function addTask(task) {
+  taskState.items.push(task)
+}
 
 export function eventsOn(key) {
   return scheduleState.byDate[key] ?? []

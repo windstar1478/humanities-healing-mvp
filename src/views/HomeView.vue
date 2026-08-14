@@ -1,15 +1,18 @@
 ﻿<script setup>
-import { ref, computed, reactive, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next'
-import { quickAuthoringItems, unassignedTasks } from '../mocks/home.js'
+import { quickAuthoringItems } from '../mocks/home.js'
 import { shiftedKey } from '../mocks/schedule.js'
-import { dayOn } from '../scheduleState.js'
+import { dayOn, canDropOn, taskState } from '../scheduleState.js'
 import { dragState, startPress, trackPress, cancelDrag } from '../dragState.js'
 import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
 
 /* 아젠다가 보여주는 창: 오늘 기준 앞뒤 3일 */
 const dayKeys = [-3, -2, -1, 0, 1, 2, 3].map((offset) => shiftedKey(offset))
-const tasks = reactive(unassignedTasks.map((task) => ({ ...task })))
+/* 미배정 할 일도 공용 상태다. 캘린더에서 만든 미정 업무가 여기 들어온다 */
+const tasks = computed(() => taskState.items)
+/* 업무는 다른 날로 옮겨 잡을 수 있어야 하므로 배치 가능한 날을 모두 넘긴다 */
+const openDates = computed(() => dayKeys.filter((key) => canDropOn(key)))
 
 const dayIndex = ref(3)
 /* 일정은 공용 상태에서 온다. 화면이 사본을 들면 캘린더와 갈라진다 */
@@ -239,9 +242,9 @@ function closeModal() {
       v-if="modal"
       :mode="modal"
       :date-key="day.key"
+      :date-options="openDates"
       :drop="dragState.pending"
       @close="closeModal"
-      @added-task="tasks.push($event)"
     />
   </div>
 </template>
