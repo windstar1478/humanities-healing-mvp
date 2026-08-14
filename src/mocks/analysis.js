@@ -1,54 +1,67 @@
-/*
- * 환자 분석 화면 mock 데이터. Figma 127:9495의 값을 그대로 옮겼다.
- *
- * 숫자는 백엔드가 내려줄 집계다. 화면이 환자 한 명 한 명을 들고 세는 게 아니라
- * 구간별 합계를 받아 그린다.
- *
- * ⚠️ 칩을 지우면 이 집계도 다시 계산되어야 하지만, 그건 백엔드 몫이라
- * 지금은 값이 그대로 남는다. 칩 제거는 강조(accent)만 바꾼다 — 확인 필요.
- */
+import { ageBucket } from './patients.js'
 
 /*
- * 필터. 각 항목이 어느 차트의 어느 구간을 강조하는지도 여기서 정한다.
- * 차트의 accent는 '선택 상태'이고, 그 선택은 곧 지금 걸린 필터다.
+ * 환자 분석의 축 정의. 집계 숫자는 여기 없다 —
+ * 화면이 명단(mocks/patients.js)에서 직접 센다.
+ *
+ * 각 축은 '환자에게서 값을 뽑는 법'(value)과 '구간을 늘어놓는 순서'(keys),
+ * 그리고 '칩에 뭐라고 쓸지'(chipLabel)를 안다.
  */
-export const filterDefs = [
-  { id: 'gender', label: '여성', dimension: 'gender', keys: ['여'] },
-  { id: 'age', label: '40대 이상', dimension: 'age', keys: ['40대', '50대', '60대 이상'] },
-  { id: 'condition', label: 'PTSD', dimension: 'condition', keys: ['PTSD'] },
-  { id: 'process', label: '프로세스 진행 중', dimension: 'process', keys: ['진행 중'] },
+
+/* 구간 순서는 고정이다. 데이터에 없는 구간도 0으로 자리를 지킨다 */
+const AGE_KEYS = ['10대 미만', '10대', '20대', '30대', '40대', '50대', '60대 이상']
+
+/*
+ * 연령은 '40대 이상'처럼 뭉쳐 읽는 게 자연스럽다.
+ * 고른 구간이 뒤쪽으로 이어져 있으면 그렇게 줄이고, 아니면 그대로 나열한다.
+ */
+function ageChipLabel(values) {
+  const picked = AGE_KEYS.filter((k) => values.includes(k))
+  const first = AGE_KEYS.indexOf(picked[0])
+  const isTail = picked.length > 1 && first + picked.length === AGE_KEYS.length
+  if (isTail) return `${picked[0]} 이상`
+  return picked.join('·')
+}
+
+export const dimensions = [
+  {
+    id: 'process',
+    title: '프로세스 상태',
+    keys: ['시작 전', '진행 중', '완료', '중단'],
+    value: (patient) => patient.process,
+    chipLabel: (values) => `프로세스 ${values.join('·')}`,
+    labelWidth: 50,
+  },
+  {
+    id: 'condition',
+    title: '진단 유형',
+    keys: ['게임과몰입', 'PTSD', '동반이환'],
+    value: (patient) => patient.condition,
+    chipLabel: (values) => values.join('·'),
+    labelWidth: 60,
+    /* 동반이환이 무엇을 겹친 것인지 밝힌다 */
+    note: '게임과몰입·PTSD',
+  },
+  {
+    id: 'age',
+    title: '연령대',
+    keys: AGE_KEYS,
+    value: (patient) => ageBucket(patient.age),
+    chipLabel: ageChipLabel,
+  },
+  {
+    id: 'gender',
+    title: '성별',
+    keys: ['남', '여'],
+    value: (patient) => patient.sex,
+    chipLabel: (values) => values.map((v) => (v === '남' ? '남성' : '여성')).join('·'),
+  },
 ]
 
-/* KPI. 강조된 구간의 합과 같다 (진행 중 128 = PTSD 128 = 여 128 = 40대 이상 128) */
-export const summary = { count: 128, total: 532, percent: 24 }
-
-export const processStatus = [
-  { key: '시작 전', count: 82 },
-  { key: '진행 중', count: 128 },
-  { key: '완료', count: 104 },
-  { key: '중단', count: 27 },
-]
-
-export const conditionTypes = [
-  { key: '게임과몰입', count: 23 },
-  { key: 'PTSD', count: 128 },
-  { key: '동반이환', count: 15 },
-]
-
-/* 동반이환이 무엇을 겹친 것인지 밝히는 주석 */
-export const conditionNote = '게임과몰입·PTSD'
-
-export const ageGroups = [
-  { key: '10대 미만', count: 4 },
-  { key: '10대', count: 17 },
-  { key: '20대', count: 46 },
-  { key: '30대', count: 59 },
-  { key: '40대', count: 68 },
-  { key: '50대', count: 38 },
-  { key: '60대 이상', count: 22 },
-]
-
-export const genders = [
-  { key: '남', count: 47 },
-  { key: '여', count: 128 },
-]
+/* Figma 127:9495의 초기 상태 — 여성 · 40대 이상 · PTSD · 프로세스 진행 중 */
+export const initialFilters = {
+  process: ['진행 중'],
+  condition: ['PTSD'],
+  age: ['40대', '50대', '60대 이상'],
+  gender: ['여'],
+}
