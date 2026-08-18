@@ -4,7 +4,7 @@ import { Search } from 'lucide-vue-next'
 import { GENERAL, PROCESS } from '../mocks/home.js'
 import { recentPatients, allPatients } from '../mocks/patients.js'
 import { dayLabel, shortDayLabel } from '../mocks/schedule.js'
-import { openHoursOn, duplicateOn, addEvent, addTask, placeTask } from '../scheduleState.js'
+import { openHoursOn, duplicateOn, addEvent, addTask, placeTask, moveEvent } from '../scheduleState.js'
 import ModalShell from './ModalShell.vue'
 
 /*
@@ -24,6 +24,8 @@ const props = defineProps({
   dateOptions: { type: Array, default: () => [] },
   /* mode='drop'일 때 { item, itemKind, hour } */
   drop: { type: Object, default: null },
+  /* mode='edit'일 때 { dateKey, event } — 이미 놓인 환자 일정을 옮긴다 */
+  editing: { type: Object, default: null },
 })
 
 const emit = defineEmits(['close', 'placed'])
@@ -53,9 +55,18 @@ const form = reactive({
   title: '',
   category: '',
   note: '',
-  date: props.mode === 'add-task' ? UNSET : (props.dateKey ?? null),
+  date: props.mode === 'add-task'
+    ? UNSET
+    : props.mode === 'edit'
+      ? props.editing.dateKey
+      : (props.dateKey ?? null),
   hour: null,
 })
+
+/* 편집은 지금 잡힌 환자·유형에서 시작한다 */
+if (props.mode === 'edit') {
+  form.patient = patientOptions.find((p) => p.name === props.editing.event.title) ?? null
+}
 
 const duplicate = ref(null)
 const visitType = ref(PROCESS)
@@ -69,13 +80,30 @@ const isWork = computed(
 )
 
 /*
+ * 편집은 이미 놓인 환자 일정을 옮기는 것이다.
+ * 대상(환자)은 바꾸지 않는다 — 다른 환자로 바꾸는 것은 지우고 새로 잡는 일이지
+ * 같은 약속을 고치는 일이 아니다. 날짜·시간·유형만 고른다.
+ */
+const isEdit = computed(() => props.mode === 'edit')
+const editingId = computed(() => (isEdit.value ? props.editing?.event.id ?? null : null))
+
+/*
  * 날짜가 넘어왔으면 보통 그대로 쓴다. 업무만은 넘어왔더라도 '미정'으로
  * 되돌릴 수 있어야 하므로 선택 구간을 계속 보여준다.
  */
 const needsDate = computed(() => props.mode !== 'drop' && (!props.dateKey || isWork.value))
 const dateChoices = computed(() => {
-  if (props.dateOptions.length) return props.dateOptions
-  return props.dateKey ? [props.dateKey] : []
+  const base = props.dateOptions.length
+    ? props.dateOptions
+    : (props.dateKey ? [props.dateKey] : [])
+  /*
+   * 편집 중인 일정이 잡힌 날은 그 자신 때문에 '빈 날' 목록에서 빠질 수 있다.
+   * 제자리를 고를 수 없으면 날짜를 안 바꾸고 시간만 옮기는 일이 불가능해진다.
+   */
+  if (isEdit.value && !base.includes(props.editing.dateKey)) {
+    return [...base, props.editing.dateKey].sort()
+  }
+  return base
 })
 
 const activeDate = computed(() => {
@@ -90,7 +118,7 @@ const placeKind = computed(() => {
 })
 
 const openHours = computed(() =>
-  activeDate.value ? openHoursOn(activeDate.value, placeKind.value) : [],
+  activeDate.value ? openHoursOn(activeDate.value, placeKind.value, editingId.value) : [],
 )
 
 /* 캘린더는 날짜 칸에 놓으므로 시간이 정해지지 않은 채로 온다 */
@@ -120,6 +148,7 @@ const patientGroups = computed(() => {
 /* 드롭이든 추가든 환자면 같은 규칙을 탄다 */
 const activePatient = computed(() => {
   if (props.mode === 'drop') return props.drop?.itemKind === 'patient' ? props.drop.item : null
+  if (isEdit.value) return form.patient
   if (props.mode === 'add-event') return form.subjectKind === 'patient' ? form.patient : null
   return null
 })
@@ -137,13 +166,16 @@ const canConfirm = computed(() => {
   /* 날짜가 미정이면 고를 시간 자체가 없다 */
   if (needsHour.value && activeDate.value && !form.hour) return false
   if (isWork.value) return form.title.trim().length > 0 || props.mode === 'drop'
-  if (props.mode === 'add-event') return Boolean(form.patient) && patientRuleOk.value
+  if (props.mode === 'add-event' || isEdit.value) return Boolean(form.patient) && patientRuleOk.value
   return activePatient.value ? patientRuleOk.value : true
 })
 
-const title = computed(() =>
-  props.mode === 'add-task' ? '작업 추가' : props.mode === 'add-event' ? '일정 추가' : '이 시간에 배치할까요?',
-)
+const title = computed(() => {
+  if (props.mode === 'add-task') return '작업 추가'
+  if (props.mode === 'add-event') return '일정 추가'
+  if (isEdit.value) return '일정 편집'
+  return '이 시간에 배치할까요?'
+})
 
 function pickPatient(patient) {
   form.patient = patient
@@ -180,11 +212,19 @@ function confirm() {
   const hour = props.mode === 'drop' ? (props.drop.hour ?? form.hour) : form.hour
 
   if (!duplicate.value) {
-    const found = duplicateOn(activeDate.value, subjectName(), movingTaskId.value)
+    const found = duplicateOn(activeDate.value, subjectName(), movingTaskId.value, editingId.value)
     if (found) {
       duplicate.value = found
       return
     }
+  }
+
+  if (isEdit.value) {
+    /* 같은 약속을 옮기는 것이다. 새로 만들지 않는다 */
+    moveEvent(props.editing.dateKey, editingId.value, activeDate.value, buildPatientEvent(hour))
+    emit('placed', { dateKey: activeDate.value, hour })
+    dismiss()
+    return
   }
 
   if (movingTaskId.value) {
@@ -222,6 +262,10 @@ onMounted(() => {
     visitType.value = props.drop?.item?.nextStep ? PROCESS : GENERAL
   } else if (props.mode === 'add-task') {
     form.hour = UNSET
+  } else if (isEdit.value) {
+    /* 제자리에서 시작한다. 편집을 열자마자 시간이 바뀌어 있으면 안 된다 */
+    form.hour = props.editing.event.hour
+    visitType.value = props.editing.event.meta?.includes(GENERAL) ? GENERAL : PROCESS
   } else {
     form.hour = props.hourKey ?? openHours.value[0] ?? null
   }
@@ -262,6 +306,12 @@ watch(() => form.date, () => {
           {{ drop.item.name }} ({{ drop.item.condition }})
         </template>
         <template v-else>{{ drop.item.title }}</template>
+      </p>
+
+      <!-- 편집은 대상을 바꾸지 않는다. 누구의 약속인지만 알려준다 -->
+      <p v-if="isEdit" class="mt-2 text-body text-text-secondary">
+        <span class="text-text-primary">{{ editing.event.title }}</span>
+        · 지금 {{ dayLabel(editing.dateKey) }} {{ editing.event.hour }}
       </p>
 
       <!--
@@ -466,7 +516,7 @@ watch(() => form.date, () => {
           class="flex h-9 items-center rounded-lg px-3 text-body"
           :class="canConfirm ? 'bg-surface-inverse text-text-inverse active:bg-surface-inverse-pressed' : 'bg-surface-field text-text-disabled'"
         >
-          {{ duplicate ? '그래도 배치' : asTask ? '추가' : '배치' }}
+          {{ duplicate ? '그래도 배치' : asTask ? '추가' : isEdit ? '저장' : '배치' }}
         </span>
       </button>
     </template>

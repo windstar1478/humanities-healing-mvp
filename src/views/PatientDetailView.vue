@@ -13,7 +13,7 @@ import {
 } from '../mocks/process.js'
 import { notesOf, addNote, updateNote, removeNote } from '../mocks/notes.js'
 import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
-import NoteDeleteModal from '../components/NoteDeleteModal.vue'
+import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
 
 /*
  * 환자 상세 (Figma 130:3152 · 148:5384).
@@ -660,9 +660,11 @@ onBeforeRouteLeave((to, from) => {
     </section>
 
     <!-- 삭제는 되돌릴 수 없다. 반드시 확인을 거친다 -->
-    <NoteDeleteModal
+    <DeleteConfirmModal
       v-if="deleting"
-      :note="deleting"
+      heading="메모를 삭제하시겠습니까?"
+      :detail="`${deleting.date} · ${deleting.context} 메모가 삭제됩니다.`"
+      warning="삭제한 메모는 복구할 수 없습니다."
       @confirm="confirmDelete"
       @close="deleting = null"
     />

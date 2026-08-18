@@ -1,18 +1,21 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import {
-  ChevronLeft, ChevronRight, ChevronDown, Plus, ArrowUpDown, Check, TriangleAlert,
+  ChevronLeft, ChevronRight, ChevronDown, Plus, ArrowUpDown, Check,
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { quickAuthoringItems } from '../mocks/home.js'
 import { findPatientByName } from '../mocks/patients.js'
 import { shiftedKey } from '../mocks/schedule.js'
 import {
-  dayOn, canDropOn, isOpenHour, leadEvent, taskState, taskWhen, findTask,
+  dayOn, canDropOn, isOpenHour, leadEvent, taskState, taskWhen, findTask, removeEvent,
 } from '../scheduleState.js'
 import { dragState, startPress, trackPress, cancelDrag } from '../dragState.js'
 import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
 import TaskDetailModal from '../components/TaskDetailModal.vue'
+import ScheduleDetailModal from '../components/ScheduleDetailModal.vue'
+import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
+import InlineCallout from '../components/InlineCallout.vue'
 
 const router = useRouter()
 
@@ -20,6 +23,8 @@ const router = useRouter()
 const dayKeys = [-3, -2, -1, 0, 1, 2, 3].map((offset) => shiftedKey(offset))
 /* 업무는 다른 날로 옮겨 잡을 수 있어야 하므로 배치 가능한 날을 모두 넘긴다 */
 const openDates = computed(() => dayKeys.filter((key) => canDropOn(key, 'task')))
+/* 환자 일정을 옮길 수 있는 날. 작업과 규칙이 달라 따로 센다 */
+const openPatientDates = computed(() => dayKeys.filter((key) => canDropOn(key)))
 
 const dayIndex = ref(3)
 /* 일정은 공용 상태에서 온다. 화면이 사본을 들면 캘린더와 갈라진다 */
@@ -188,6 +193,24 @@ function openTask(task) {
 }
 
 /*
+ * 환자 일정의 되돌리기 경로. 상세에서 편집·삭제로 갈라진다.
+ * 팝오버는 먼저 닫는다 — 모달만 history 엔트리를 갖게 하기 위함이다.
+ */
+const detailEvent = ref(null)
+const editingEvent = ref(null)
+const deletingEvent = ref(null)
+
+function openEventDetail(event) {
+  rowPopover.value = null
+  detailEvent.value = { dateKey: day.value.key, event }
+}
+
+function confirmDeleteEvent() {
+  removeEvent(deletingEvent.value.dateKey, deletingEvent.value.event.id)
+  deletingEvent.value = null
+}
+
+/*
  * 여러 건이 접힌 행은 목록부터 연다. 가벼운 콘텐츠라 모달이 아니라 팝오버다 —
  * 캘린더 날짜 팝오버와 같은 문법이고 history entry를 만들지 않는다.
  */
@@ -209,10 +232,12 @@ function openRow(row, event) {
     openTask(findTask(only.taskId))
     return
   }
-  /* 환자 일정은 환자 상세로 간다. 이벤트는 이름만 들고 있어 원본을 찾는다 */
+  /*
+   * 환자 일정은 일정 상세로 연다 — 작업 블록이 작업 상세로 열리는 것과 같은 문법이다.
+   * 환자 상세로 가는 길은 그 모달 안에 남는다.
+   */
   if (only) {
-    const found = findPatientByName(only.title)
-    if (found) router.push({ path: `/patients/detail/${found.id}` })
+    openEventDetail(only)
     return
   }
   /*
@@ -220,7 +245,15 @@ function openRow(row, event) {
    * 고장으로 읽힌다 — 비활성은 이유와 함께 와야 한다.
    */
   if (isPast(row)) {
-    rowPopover.value = { row, anchor: anchorOf(event), warning: '지난 시간에는 일정을 추가할 수 없습니다' }
+    rowPopover.value = {
+      row,
+      anchor: anchorOf(event),
+      /* 무엇이 안 되는지 + 언제 되는지. 둘째 줄이 없으면 뚫을 방법을 모른다 */
+      warning: {
+        title: '지난 시간에는 일정을 추가할 수 없습니다',
+        detail: '아직 지나지 않은 시간에만 추가할 수 있습니다',
+      },
+    }
     return
   }
   openAdd('add-event', row.hour)
@@ -230,7 +263,7 @@ function openRow(row, event) {
 const rowPopoverStyle = computed(() => {
   if (!rowPopover.value) return {}
   const WIDTH = 280
-  const HEIGHT = rowPopover.value.warning ? 72 : 300
+  const HEIGHT = rowPopover.value.warning ? 56 : 300
   const GAP = 8
   const MARGIN = 24
   const { left, top, height } = rowPopover.value.anchor
@@ -238,7 +271,8 @@ const rowPopoverStyle = computed(() => {
   return {
     left: `${Math.max(MARGIN, left - WIDTH - GAP)}px`,
     top: `${Math.min(Math.max(MARGIN, wanted), window.innerHeight - HEIGHT - MARGIN)}px`,
-    width: `${WIDTH}px`,
+    /* 콜아웃은 문구 길이에 맞춰 줄어든다. 목록 팝오버만 고정 폭이다 */
+    ...(rowPopover.value.warning ? { maxWidth: `${WIDTH}px` } : { width: `${WIDTH}px` }),
   }
 })
 </script>
@@ -491,18 +525,12 @@ const rowPopoverStyle = computed(() => {
     <!-- 한 시간에 여러 건이 있을 때. 캘린더 날짜 팝오버와 같은 문법이다 -->
     <Teleport to="body">
       <div v-if="rowPopover" class="fixed inset-0 z-50" @click="rowPopover = null">
-        <!--
-          비활성 사유 콜아웃. 아무 반응이 없으면 고장으로 읽힌다.
-          Figma 176:5079(주황 테두리 + ⚠)를 아직 열지 않아 초안이다.
-        -->
-        <div
-          v-if="rowPopover.warning"
-          class="absolute flex items-center gap-2 rounded-2xl border border-warning-fg bg-surface-card px-3 py-3"
-          :style="rowPopoverStyle"
-          @click.stop
-        >
-          <TriangleAlert :size="16" class="shrink-0 text-warning-fg" />
-          <span class="text-label text-text-primary">{{ rowPopover.warning }}</span>
+        <!-- 비활성 사유 콜아웃 (Figma 176:5336). 아무 반응이 없으면 고장으로 읽힌다 -->
+        <div v-if="rowPopover.warning" class="absolute" :style="rowPopoverStyle" @click.stop>
+          <InlineCallout
+            :title="rowPopover.warning.title"
+            :detail="rowPopover.warning.detail"
+          />
         </div>
 
         <div
@@ -524,7 +552,7 @@ const rowPopoverStyle = computed(() => {
               :key="i"
               class="flex min-h-11 w-full items-center gap-2 py-1 text-left active:bg-surface-pressed"
               :class="i > 0 ? 'border-t border-border-subtle' : ''"
-              @click="event.taskId && openTask(findTask(event.taskId))"
+              @click="event.taskId ? openTask(findTask(event.taskId)) : openEventDetail(event)"
             >
               <Check
                 v-if="event.done"
@@ -563,6 +591,35 @@ const rowPopoverStyle = computed(() => {
       v-if="detailTask"
       :task="detailTask"
       @close="detailTask = null"
+    />
+
+    <!-- 환자 일정: 상세 → 편집 · 삭제 -->
+    <ScheduleDetailModal
+      v-if="detailEvent"
+      :date-key="detailEvent.dateKey"
+      :event="detailEvent.event"
+      :patient="findPatientByName(detailEvent.event.title)"
+      @open-patient="router.push({ path: `/patients/detail/${findPatientByName(detailEvent.event.title).id}` })"
+      @edit="editingEvent = detailEvent"
+      @delete="deletingEvent = detailEvent"
+      @close="detailEvent = null"
+    />
+
+    <ScheduleEntryModal
+      v-if="editingEvent"
+      mode="edit"
+      :editing="editingEvent"
+      :date-options="openPatientDates"
+      @close="editingEvent = null"
+    />
+
+    <DeleteConfirmModal
+      v-if="deletingEvent"
+      heading="일정을 삭제하시겠습니까?"
+      :detail="`${deletingEvent.event.hour} ${deletingEvent.event.title} 일정이 삭제됩니다.`"
+      warning="삭제한 일정은 복구할 수 없습니다."
+      @confirm="confirmDeleteEvent"
+      @close="deletingEvent = null"
     />
   </div>
 </template>

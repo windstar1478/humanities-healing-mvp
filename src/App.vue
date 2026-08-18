@@ -12,6 +12,20 @@ import {
   swallowDragClick, beginGesture,
 } from './dragState.js'
 
+/*
+ * 좌측 하단 프로필 사진.
+ *
+ * 파일이 있으면 쓰고 없으면 이름 첫 글자로 대체한다. import.meta.glob으로 찾는 것은
+ * 정적 import와 달리 파일이 없어도 빌드가 깨지지 않기 때문이다 — 목업 자산이라
+ * 저장소에 항상 들어 있다고 보장할 수 없다.
+ * `src/assets/profile.*`에 넣으면 그대로 붙는다(png · jpg · svg · webp).
+ */
+const profilePhoto = Object.values(
+  import.meta.glob('./assets/profile.*', { eager: true, query: '?url', import: 'default' }),
+)[0] ?? null
+
+const COUNSELOR = { name: '강치유', hospital: '중앙대학교 병원' }
+
 const navGroups = [
   [
     { label: '업무',       to: '/',              icon: ClipboardList },
@@ -99,10 +113,24 @@ onUnmounted(() => {
   <div class="flex flex-col items-start gap-1 px-1">
     <!-- 프로필 -->
     <div class="flex h-[52px] items-center gap-1.5 whitespace-nowrap">
-      <div class="size-9 shrink-0 rounded-full bg-surface-field"></div>
+      <!--
+        표면 분리는 border로 한다(그림자 금지). 사진이 흰 배경이면 원의 경계가
+        사라지므로 테두리를 항상 둔다. overflow-hidden으로 사진을 원에 가둔다
+      -->
+      <div class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-default bg-surface-field">
+        <img
+          v-if="profilePhoto"
+          :src="profilePhoto"
+          alt=""
+          class="size-full object-contain"
+        />
+        <span v-else class="text-label font-medium text-text-secondary">
+          {{ COUNSELOR.name.slice(0, 1) }}
+        </span>
+      </div>
       <div class="leading-tight">
-        <div class="text-label font-medium">강치유</div>
-        <div class="text-count font-normal text-text-secondary">중앙대학교 병원</div>
+        <div class="text-label font-medium">{{ COUNSELOR.name }}</div>
+        <div class="text-count font-normal text-text-secondary">{{ COUNSELOR.hospital }}</div>
       </div>
     </div>
 

@@ -8,9 +8,17 @@ import { tasks } from './mocks/tasks.js'
  * 일정의 유일한 가변 상태. 목업을 한 번 복사해 두고 모든 화면이 함께 읽고 쓴다.
  * 화면마다 사본을 들면 아젠다에서 배치한 일정이 캘린더에 보이지 않는다.
  */
+/*
+ * 환자 일정에는 id를 붙인다. 편집·삭제가 한 건을 특정해야 하는데,
+ * 이름+시간으로 찾으면 같은 날 같은 환자를 두 번 만나는 경우에 갈린다.
+ * (업무 블록은 작업에서 파생하므로 원본 작업의 id를 그대로 쓴다)
+ */
+let eventSequence = 0
+const withId = (event) => ({ ...event, id: `ev-${++eventSequence}` })
+
 export const scheduleState = reactive({
   byDate: Object.fromEntries(
-    Object.entries(eventsByDate).map(([key, events]) => [key, events.map((e) => ({ ...e }))]),
+    Object.entries(eventsByDate).map(([key, events]) => [key, events.map(withId)]),
   ),
 })
 
@@ -150,15 +158,17 @@ export function dayOn(key) {
  * - 환자는 아무것도 없어야 한다
  * - 작업은 다른 작업 위에는 겹칠 수 있다. 환자 일정이 있는 시간만 막는다
  */
-export function isOpenHour(row, kind = 'patient') {
+export function isOpenHour(row, kind = 'patient', exceptEventId = null) {
   if (row.state === 'past') return false
-  if (!row.events.length) return true
-  return kind === 'task' && row.events.every((e) => e.taskId)
+  /* 편집 중인 일정 자신은 그 시간을 막지 않는다. 제자리를 못 고르면 안 된다 */
+  const others = exceptEventId ? row.events.filter((e) => e.id !== exceptEventId) : row.events
+  if (!others.length) return true
+  return kind === 'task' && others.every((e) => e.taskId)
 }
 
-export function openHoursOn(key, kind = 'patient') {
+export function openHoursOn(key, kind = 'patient', exceptEventId = null) {
   return rowsOn(key)
-    .filter((row) => isOpenHour(row, kind))
+    .filter((row) => isOpenHour(row, kind, exceptEventId))
     .map((row) => row.hour)
 }
 
@@ -171,15 +181,46 @@ export function canDropOn(key, kind = 'patient') {
  * 같은 날 같은 대상이 이미 있는지.
  * 이미 배치된 작업을 다른 시간으로 옮길 때 자기 자신이 걸리면 안 되므로 제외한다.
  */
-export function duplicateOn(key, title, exceptTaskId = null) {
+export function duplicateOn(key, title, exceptTaskId = null, exceptEventId = null) {
   return eventsOn(key).find(
-    (e) => e.title === title && (!exceptTaskId || e.taskId !== exceptTaskId),
+    (e) => e.title === title
+      && (!exceptTaskId || e.taskId !== exceptTaskId)
+      && (!exceptEventId || e.id !== exceptEventId),
   ) ?? null
 }
 
 export function addEvent(key, event) {
   if (!scheduleState.byDate[key]) scheduleState.byDate[key] = []
-  scheduleState.byDate[key].push(event)
+  scheduleState.byDate[key].push(withId(event))
+}
+
+export function findEvent(key, id) {
+  return scheduleState.byDate[key]?.find((e) => e.id === id) ?? null
+}
+
+/*
+ * 배치를 되돌리는 두 경로. 스낵바 실행취소가 아니라 명시적 편집·삭제다 —
+ * 시간 제한이 있는 실행취소는 "저장은 명시적 조작으로만" 규칙과 어긋난다.
+ */
+export function removeEvent(key, id) {
+  const list = scheduleState.byDate[key]
+  if (!list) return
+  const index = list.findIndex((e) => e.id === id)
+  if (index >= 0) list.splice(index, 1)
+}
+
+/*
+ * 날짜가 바뀌면 옮겨 담는다. 같은 객체를 그대로 옮겨야 id가 유지되고,
+ * 편집 모달이 자기 자신을 중복·점유 검사에서 제외할 수 있다.
+ */
+export function moveEvent(fromKey, id, toKey, patch) {
+  const event = findEvent(fromKey, id)
+  if (!event) return
+  Object.assign(event, patch)
+  if (fromKey === toKey) return
+  removeEvent(fromKey, id)
+  if (!scheduleState.byDate[toKey]) scheduleState.byDate[toKey] = []
+  scheduleState.byDate[toKey].push(event)
 }
 
 /*
