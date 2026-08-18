@@ -25,6 +25,16 @@ export default createRouter({
       component: () => import('./views/PatientDetailView.vue'),
       meta: { noPatientPanel: true },
     },
+    /*
+     * 코어 프로세스 6단계. 프로세스를 다루는 화면이라 우측 패널이 없다
+     * (Figma 148:7242의 본문도 929로, 패널 자리가 없다).
+     * 단계는 경로에 들어간다 — 새로고침·뒤로가기가 같은 단계로 돌아와야 한다.
+     */
+    {
+      path: '/process/:id/:step',
+      component: () => import('./views/ProcessView.vue'),
+      meta: { noPatientPanel: true },
+    },
     {
       path: '/effectiveness',
       component: () => import('./views/EffectivenessView.vue'),

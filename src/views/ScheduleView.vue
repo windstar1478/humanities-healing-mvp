@@ -48,6 +48,24 @@ function isFaded(cell) {
   return dropState(cell) === 'active' && dragState.hoverDate && dragState.hoverDate !== cell.key
 }
 
+/*
+ * 놓을 수 없는 날에 놓았을 때 뜰 사유. 캘린더는 단위가 날짜라
+ * 막히는 이유가 둘이다 — 지난 날이거나, 그 날에 빈 시간이 하나도 없거나.
+ */
+function blockedReason(cell) {
+  if (dropState(cell) !== 'blocked') return null
+  if (cell.key < TODAY_KEY) {
+    return {
+      title: '지난 날짜에는 배치할 수 없습니다',
+      detail: '오늘부터의 날짜에만 놓을 수 있습니다',
+    }
+  }
+  return {
+    title: '빈 시간이 없는 날입니다',
+    detail: '다른 날짜를 고르거나 기존 일정을 먼저 옮겨야 합니다',
+  }
+}
+
 /* 셀에는 두 건까지만 보이고 나머지는 접힌다 */
 const visibleEvents = (events) => events.slice(0, 2)
 const overflowCount = (events) => Math.max(0, events.length - 2)
@@ -190,6 +208,8 @@ function isPastEvent(key, hour) {
           v-for="cell in cells"
           :key="cell.key"
           :data-drop-date="dropState(cell) === 'active' ? cell.key : null"
+          :data-blocked-title="blockedReason(cell)?.title"
+          :data-blocked-detail="blockedReason(cell)?.detail"
           class="flex min-h-0 flex-col gap-1 overflow-hidden p-2 text-left transition duration-150 ease-standard"
           :class="[
             /*

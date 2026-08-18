@@ -14,6 +14,7 @@ import {
 import { notesOf, addNote, updateNote, removeNote } from '../mocks/notes.js'
 import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
 import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
+import InlineCallout from '../components/InlineCallout.vue'
 
 /*
  * 환자 상세 (Figma 130:3152 · 148:5384).
@@ -47,6 +48,42 @@ function stepState(index) {
 }
 
 const stepStateLabel = { done: '완료', current: '진행 중', waiting: '대기' }
+
+/*
+ * 스테퍼 노드는 모두 누를 수 있다. 완료된 단계는 그 단계로 되돌아가 내용을 보는
+ * 빠른 진입점이고, 진행 중 단계는 '이어하기'와 같은 곳으로 간다.
+ *
+ * 대기 단계만 갈 수 없다 — 아직 도달하지 않은 단계에 임의로 들어가면
+ * 시스템 안정성이 깨진다(배치 유형에서 단계를 고르지 않는 것과 같은 이유).
+ * 그래도 **누르면 이유를 말한다.** 아무 반응이 없으면 고장으로 읽힌다.
+ */
+const stepBlocked = ref(null)
+
+function openStep(i, event) {
+  if (stepState(i) === 'waiting') {
+    const r = event.currentTarget.getBoundingClientRect()
+    stepBlocked.value = {
+      title: '아직 진행할 수 없는 단계입니다',
+      detail: `${PROCESS_STEPS[currentStep.value]}을(를) 마치면 열립니다`,
+      x: r.left + r.width / 2,
+      y: r.bottom,
+    }
+    return
+  }
+  router.push({ path: `/process/${patient.value.id}/${i}` })
+}
+
+/* 콜아웃은 노드 아래에 붙이되 화면 밖으로 나가지 않게 가둔다 */
+const stepBlockedStyle = computed(() => {
+  if (!stepBlocked.value) return {}
+  const WIDTH = 280
+  const MARGIN = 24
+  const { x, y } = stepBlocked.value
+  return {
+    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), window.innerWidth - WIDTH - MARGIN)}px`,
+    top: `${y + 8}px`,
+  }
+})
 
 const TABS = [
   { id: 'history', label: '프로세스 히스토리' },
@@ -307,7 +344,11 @@ onBeforeRouteLeave((to, from) => {
                 : 'h-px bg-border-default'"
             ></span>
 
-            <span class="flex w-[91px] shrink-0 flex-col items-center gap-2">
+            <!-- 노드 전체가 터치 대상이다. 원만 누르게 하면 라벨이 헛돈다 -->
+            <button
+              class="flex w-[91px] shrink-0 flex-col items-center gap-2 rounded-lg py-1 active:bg-surface-pressed"
+              @click="openStep(i, $event)"
+            >
               <span
                 class="flex size-12 items-center justify-center rounded-full"
                 :class="{
@@ -352,7 +393,7 @@ onBeforeRouteLeave((to, from) => {
                   {{ stepStateLabel[stepState(i)] }}
                 </span>
               </span>
-            </span>
+            </button>
           </template>
         </div>
       </div>
@@ -373,6 +414,7 @@ onBeforeRouteLeave((to, from) => {
         <button
           v-if="isRunning"
           class="flex h-11 w-[170px] shrink-0 items-center justify-center gap-1 rounded-2xl text-body text-text-primary active:bg-surface-pressed"
+          @click="openStep(currentStep, $event)"
         >
           <span class="truncate">{{ PROCESS_STEPS[currentStep] }} 이어하기</span>
           <ChevronRight :size="12" class="shrink-0" />
@@ -658,6 +700,15 @@ onBeforeRouteLeave((to, from) => {
         </div>
       </div>
     </section>
+
+    <!-- 아직 도달하지 않은 단계를 눌렀을 때. 비활성은 이유와 함께 와야 한다 -->
+    <Teleport to="body">
+      <div v-if="stepBlocked" class="fixed inset-0 z-50" @click="stepBlocked = null">
+        <div class="absolute max-w-[280px]" :style="stepBlockedStyle">
+          <InlineCallout :title="stepBlocked.title" :detail="stepBlocked.detail" />
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 삭제는 되돌릴 수 없다. 반드시 확인을 거친다 -->
     <DeleteConfirmModal

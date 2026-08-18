@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ClipboardList, CalendarDays, Users, TrendingUp, PenTool,
@@ -8,9 +8,10 @@ import {
 } from 'lucide-vue-next'
 import { recentPatients, allPatients } from './mocks/patients.js'
 import {
-  dragState, startPress, trackPress, trackDrag, endPress, cancelDrag,
+  dragState, startPress, trackPress, trackDrag, endPress, cancelDrag, clearRejected,
   swallowDragClick, beginGesture,
 } from './dragState.js'
+import InlineCallout from './components/InlineCallout.vue'
 
 /*
  * 좌측 하단 프로필 사진.
@@ -25,6 +26,22 @@ const profilePhoto = Object.values(
 )[0] ?? null
 
 const COUNSELOR = { name: '강치유', hospital: '중앙대학교 병원' }
+
+/*
+ * 거부 콜아웃은 손을 뗀 자리 옆에 뜬다. 그 자리가 방금 조작한 곳이라
+ * 시선이 이미 거기에 있다. 화면 밖으로는 나가지 않게 가둔다.
+ */
+const rejectedStyle = computed(() => {
+  if (!dragState.rejected) return {}
+  const WIDTH = 280
+  const HEIGHT = 56
+  const GAP = 12
+  const MARGIN = 24
+  const { x, y } = dragState.rejected
+  const left = Math.min(x + GAP, window.innerWidth - WIDTH - MARGIN)
+  const top = Math.min(Math.max(MARGIN, y - HEIGHT / 2), window.innerHeight - HEIGHT - MARGIN)
+  return { left: `${Math.max(MARGIN, left)}px`, top: `${top}px` }
+})
 
 const navGroups = [
   [
@@ -272,6 +289,25 @@ onUnmounted(() => {
               {{ dragState.item.category }}
             </span>
           </span>
+        </div>
+      </div>
+    </Teleport>
+
+    <!--
+      놓을 수 없는 자리에 놓았을 때. 드래그 중에는 blocked 표현이 보이지만
+      손을 떼는 순간 그것이 통째로 사라져, 아무 일도 일어나지 않은 것처럼 보인다.
+      비활성 자리를 눌렀을 때와 같은 콜아웃으로 이유를 남긴다.
+
+      드래그는 셸이 관리하므로 여기 한 곳에만 둔다 — 아젠다와 캘린더가
+      각자 띄우면 두 화면의 문법이 갈라진다.
+    -->
+    <Teleport to="body">
+      <div v-if="dragState.rejected" class="fixed inset-0 z-50" @click="clearRejected">
+        <div class="absolute max-w-[280px]" :style="rejectedStyle">
+          <InlineCallout
+            :title="dragState.rejected.title"
+            :detail="dragState.rejected.detail"
+          />
         </div>
       </div>
     </Teleport>

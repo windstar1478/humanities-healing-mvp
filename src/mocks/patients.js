@@ -14,6 +14,8 @@
  *    실제 값이 확정되면 이 명단을 갈아끼우면 된다.
  */
 
+import { reactive } from 'vue'
+
 const P = (id, name, age, sex, condition, process, status, nextStep = null) => ({
   id, name, age, sex, condition, process, status, nextStep,
 })
@@ -23,7 +25,12 @@ const 진행중 = '진행 중'
 const 완료 = '완료'
 const 중단 = '중단'
 
-export const patients = [
+/*
+ * reactive인 것은 프로세스 할당 때문이다. 프로세스 시작 단계에서 환자의
+ * process·status·nextStep이 바뀌는데, 평범한 배열이면 스테퍼도 우측 패널도
+ * 분석 화면도 그 자리에서 갱신되지 않는다. 명단이 하나뿐이라 여기 한 곳만 감싸면 된다.
+ */
+export const patients = reactive([
   /* 일정·타임라인에 이름이 나오는 사람들이 앞에 온다 */
   P('p-1', '이준호', 31, '남', '게임과몰입', 진행중, '프로그램 수행', '감정평가 (사후)'),
   P('p-2', '김철수', 27, '남', '게임과몰입', 진행중, '감정평가 (사전)', '프로그램 처방'),
@@ -71,7 +78,7 @@ export const patients = [
   P('p-38', '오지환', 46, '남', 'PTSD', 완료, '프로세스 종료', null),
   P('p-39', '한소미', 51, '여', '게임과몰입', 완료, '프로세스 종료', null),
   P('p-40', '정도현', 63, '남', '동반이환', 완료, '프로세스 종료', null),
-]
+])
 
 /*
  * 일정 이벤트는 환자 이름만 들고 있다. 상세로 들어갈 때 원본을 찾는다.

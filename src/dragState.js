@@ -19,6 +19,13 @@ export const dragState = reactive({
   hoverDate: null,
   /* 손을 뗀 뒤 확인 대기 중인 배치. { item, itemKind, hour, dateKey } */
   pending: null,
+  /*
+   * 놓을 수 없는 자리에 놓았을 때의 사유. { title, detail, x, y }
+   * 드롭 상태가 blocked인 것은 드래그하는 동안 보이지만, 손을 떼는 순간
+   * 그 표현이 통째로 사라진다. 아무 일도 일어나지 않으면 고장으로 읽히므로
+   * 비활성 사유 콜아웃과 같은 문법으로 이유를 남긴다.
+   */
+  rejected: null,
 })
 
 /* 꾹 누르기 인식 임계. Figma 정의값이 아니라 잠정값 */
@@ -72,9 +79,18 @@ function resetDrag() {
  */
 function targetUnder(x, y) {
   const el = document.elementFromPoint(x, y)
+  /*
+   * 놓을 수 없는 자리도 표시를 달고 있다. 놓을 수 있는 자리만 표시하면
+   * '막힌 자리'와 '아무것도 없는 빈 화면'을 구분할 수 없어서,
+   * 빗나간 드롭까지 경고가 뜬다.
+   */
+  const blocked = el?.closest('[data-blocked-title]')
   return {
     hour: el?.closest('[data-drop-hour]')?.dataset.dropHour ?? null,
     date: el?.closest('[data-drop-date]')?.dataset.dropDate ?? null,
+    blocked: blocked
+      ? { title: blocked.dataset.blockedTitle, detail: blocked.dataset.blockedDetail ?? null }
+      : null,
   }
 }
 
@@ -126,9 +142,16 @@ export function endPress(event) {
         hour: live.hour,
         dateKey: live.date,
       }
+    } else if (live.blocked) {
+      /* 놓을 수 없는 자리다. 왜 안 되는지 손 뗀 자리에 남긴다 */
+      dragState.rejected = { ...live.blocked, x: dragState.x, y: dragState.y }
     }
   }
   resetDrag()
+}
+
+export function clearRejected() {
+  dragState.rejected = null
 }
 
 /* 취소는 배치하지 않고 빠져나온다 */

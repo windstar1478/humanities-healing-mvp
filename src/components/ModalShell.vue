@@ -21,6 +21,11 @@ const props = defineProps({
   /*
    * 'modal' — 폭 360 / 라운드 16 / 본문 스크롤 + 하단 고정 버튼 행.
    *           배치 확인 · 일정 추가 · 작업 추가 · 작업 상세가 여기 해당한다.
+   * 'large'  — 690×480 / 라운드 16 (Figma 172:2899). 무거운 콘텐츠용이다.
+   *           프로세스 상세가 여기 해당한다 — 단계 아코디언까지 들어가서
+   *           360으로는 표가 접힌다. 본문만 스크롤하고 버튼 행은 하단에 고정하되,
+   *           행의 구성이 상태마다 바뀌므로(할당하기 → 취소·할당 확정)
+   *           구분선만 셸이 긋고 안쪽은 슬롯에 맡긴다
    * 'alert'  — 폭 402 / 라운드 8 / 짧은 확인 한 덩어리 (Figma 186:6839 · 190:9039).
    *           내용이 짧아 스크롤도 구분선도 필요 없고, 버튼 배치도 경고마다 다르다.
    *           그래서 셸은 상자만 잡고 안쪽은 통째로 슬롯에 맡긴다.
@@ -58,7 +63,7 @@ defineExpose({ dismiss })
     <div
       class="fixed inset-0 z-50 flex items-center justify-center p-6"
       :style="{ backgroundColor: 'var(--scrim)' }"
-      @click.self="variant === 'modal' ? dismiss() : null"
+      @click.self="variant === 'alert' ? null : dismiss()"
     >
       <!--
         alert은 스크림 탭으로 닫지 않는다. 되돌릴 수 없는 조작(삭제)이나
@@ -70,6 +75,22 @@ defineExpose({ dismiss })
         class="flex max-h-full w-[402px] flex-col overflow-hidden rounded-lg border border-border-default bg-surface-card px-3 py-2"
       >
         <slot :dismiss="dismiss" />
+      </div>
+
+      <!--
+        대형 모달. 버튼 행은 상태마다 구성이 달라(닫기·할당하기 / 취소·할당 확정)
+        셸은 구분선과 자리만 잡는다
+      -->
+      <div
+        v-else-if="variant === 'large'"
+        class="flex h-[480px] max-h-full w-[690px] flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card px-4 py-2"
+      >
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <slot :dismiss="dismiss" />
+        </div>
+        <div class="flex shrink-0 items-center justify-end gap-3 border-t border-border-strong">
+          <slot name="actions" :dismiss="dismiss" />
+        </div>
       </div>
 
       <!-- 내용이 길어져도 화면을 넘기지 않는다. 본문만 스크롤하고 버튼은 고정 -->

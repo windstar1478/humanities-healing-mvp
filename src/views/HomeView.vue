@@ -148,6 +148,31 @@ function blockPressClass(row) {
 }
 
 /*
+ * 놓을 수 없는 자리에 놓았을 때 뜰 사유.
+ * 지난 시간과 '이미 차 있음'은 막힌 이유가 달라 문구도 갈린다.
+ * 작업은 다른 작업 위에 겹칠 수 있으므로 막히는 것은 환자 일정이 있는 행뿐이다.
+ */
+function blockedReason(row) {
+  if (dropState(row) !== 'blocked') return null
+  if (isPast(row)) {
+    return {
+      title: '지난 시간에는 배치할 수 없습니다',
+      detail: '아직 지나지 않은 시간에만 놓을 수 있습니다',
+    }
+  }
+  if (dragState.itemKind === 'task') {
+    return {
+      title: '환자 일정이 있는 시간입니다',
+      detail: '작업은 비어 있거나 다른 작업만 있는 시간에 놓을 수 있습니다',
+    }
+  }
+  return {
+    title: '이미 일정이 있는 시간입니다',
+    detail: '환자 일정은 비어 있는 시간에만 놓을 수 있습니다',
+  }
+}
+
+/*
  * 일정 블록은 행 배경보다 한 단계 더 어둡다.
  * 지난 행은 행 자체가 recessed로 깔리므로 블록은 canvas로 내려간다.
  */
@@ -452,6 +477,8 @@ const rowPopoverStyle = computed(() => {
           <button
             v-if="row.events.length"
             :data-drop-hour="dropState(row) === 'active' ? row.hour : null"
+            :data-blocked-title="blockedReason(row)?.title"
+            :data-blocked-detail="blockedReason(row)?.detail"
             class="flex min-h-11 flex-1 items-center gap-3 overflow-hidden rounded-lg border pr-3 text-left transition-colors duration-150 ease-standard"
             :class="[blockClass(row), blockPressClass(row), isFaded(row) ? 'opacity-40' : '']"
             @click="openRow(row, $event)"
@@ -503,6 +530,8 @@ const rowPopoverStyle = computed(() => {
           <button
             v-else
             :data-drop-hour="dropState(row) === 'active' ? row.hour : null"
+            :data-blocked-title="blockedReason(row)?.title"
+            :data-blocked-detail="blockedReason(row)?.detail"
             class="flex min-h-11 flex-1 items-center overflow-hidden rounded-lg border transition duration-150 ease-standard"
             :class="[
               dropState(row) === 'active' ? 'border-dashed border-border-selected bg-selected-bg' : '',
