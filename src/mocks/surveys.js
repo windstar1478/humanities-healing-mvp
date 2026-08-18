@@ -310,6 +310,21 @@ export function submitSurvey(patientId, phase, code) {
   return draft
 }
 
+/*
+ * 결과 등급. 프로그램 처방 화면의 배지가 이것을 쓴다.
+ *
+ * ⚠️ Figma 4건(PCL-5 42/80 고위험 · CAPS-5 20/40 고위험 · GAD-7 8/21 중증도 ·
+ *    WHOQOL 60/100 정상)에서 **역산한 규칙**이다 — 컷오프를 넘겼는지와
+ *    핵심/보조 중 무엇인지 둘로 갈린다. 실제 판정 기준은 척도마다 다르므로
+ *    확인이 필요하다(6.2절).
+ */
+export function gradeOf(survey, score) {
+  /* 값이 없는 것을 '정상'으로 두면 안 한 것과 괜찮은 것이 같아 보인다 */
+  if (score === null || score === undefined) return '미작성'
+  if (!survey.cutoff || score < survey.cutoff) return '정상'
+  return survey.role === '핵심' ? '고위험' : '중증도'
+}
+
 /* 미응답 문항 수. 제출 가능 여부와 진행률이 같은 값을 본다 */
 export function answeredCount(survey, answers) {
   return survey.questions.filter((_, i) => answers[i] !== undefined).length

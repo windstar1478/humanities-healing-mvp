@@ -7,6 +7,7 @@ import { PROCESS_STEPS, STATUS_OF_STEP, stepIndexOf, stepStateOf } from '../mock
 import InlineCallout from '../components/InlineCallout.vue'
 import ProcessStartStep from '../components/ProcessStartStep.vue'
 import EmotionReviewStep from '../components/EmotionReviewStep.vue'
+import ProgramPrescribeStep from '../components/ProgramPrescribeStep.vue'
 
 /*
  * 코어 프로세스 6단계의 공통 셸 (Figma 148:7242 · 148:7729 · 173:5511 ·
@@ -44,6 +45,13 @@ function advance() {
   patient.value.nextStep = STATUS_OF_STEP[next + 1] ?? null
   /* 프로세스를 '완료'로 바꾸는 것은 마지막 단계의 종결 조작이다. 여기서 하지 않는다 */
   router.push({ path: `/process/${patient.value.id}/${next}` })
+}
+
+/* 처방은 프로그램을 환자에게 붙이는 일이다. 그 뒤 단계 이동은 advance와 같다 */
+function prescribe(program) {
+  patient.value.programId = program.id
+  patient.value.programName = program.name
+  advance()
 }
 
 const blocked = ref(null)
@@ -160,6 +168,12 @@ const blockedStyle = computed(() => {
         :patient="patient"
         :step="step"
         @advance="advance"
+      />
+      <!-- 2단계. 고른 프로그램은 환자 레코드에 남는다 -->
+      <ProgramPrescribeStep
+        v-else-if="step === 2"
+        :patient="patient"
+        @advance="prescribe"
       />
       <div v-else class="flex min-h-0 flex-1 items-center justify-center">
         <p class="text-body text-text-disabled">
