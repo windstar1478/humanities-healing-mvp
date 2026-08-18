@@ -123,20 +123,23 @@ function isSelected(row) {
  * 확실히 다른 값이라 뭘 누르고 있는지 보인다.
  * 선택된 자리는 selected-bg-pressed로 눌러 accent를 잃지 않는다.
  * 드래그 중에는 넣지 않는다 — 드롭 상태 표현과 겹친다.
+ *
+ * 지난 행은 행과 블록이 함께 pressed-strong으로 내려간다.
+ * 지난 행의 블록은 평소가 canvas라 pressed(#EEF0F3)와 값이 같아 눌러도 변화가 없다.
+ * 그렇다고 블록만 strong으로 내리면 행(#EEF0F3)보다 블록(#E8EAEE)이 어두워
+ * '박스가 눌린 것'으로 읽힌다 — 지나지 않은 행은 둘이 같은 색이라 행 전체가
+ * 눌린 것으로 보이는데, 같은 제스처가 두 가지로 읽히면 안 된다.
+ * 둘 다 strong으로 내려 한 색 띠를 만든다.
  */
 function pressClass(row) {
   if (dragState.item) return ''
-  return isSelected(row) ? 'active:bg-selected-bg-pressed' : 'active:bg-surface-pressed'
-}
-
-/*
- * 지난 행의 블록은 평소가 canvas라 pressed와 값이 같다 — 눌러도 변화가 없다.
- * 반 단계 더 내려서 누른 것이 보이게 하고, 눌린 행보다 어둡게 유지해 계단을 지킨다.
- */
-function blockPressClass(row) {
-  if (dragState.item) return ''
   if (isSelected(row)) return 'active:bg-selected-bg-pressed'
   return isPast(row) ? 'active:bg-surface-pressed-strong' : 'active:bg-surface-pressed'
+}
+
+/* 블록도 행과 같은 값으로 눌린다 (위 주석 참고) */
+function blockPressClass(row) {
+  return pressClass(row)
 }
 
 /*

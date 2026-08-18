@@ -166,7 +166,12 @@ function isPastEvent(key, hour) {
           :data-drop-date="dropState(cell) === 'active' ? cell.key : null"
           class="flex min-h-0 flex-col gap-1 overflow-hidden p-2 text-left transition duration-150 ease-standard"
           :class="[
-            cell.dimmed && !dropState(cell) ? 'opacity-40' : '',
+            /*
+             * 앞뒤 달 칸은 평소 opacity-40이다. 누르는 동안에는 걷어낸다 —
+             * 그러지 않으면 눌린 색까지 40%로 씻겨 반응이 거의 보이지 않는다.
+             * 드래그 중에 걷어내는 것(!dropState)과 같은 이유다
+             */
+            cell.dimmed && !dropState(cell) ? 'opacity-40 active:opacity-100' : '',
             isFaded(cell) ? 'opacity-40' : '',
             dropState(cell) === 'active'
               ? 'bg-selected-bg ring-2 ring-inset ring-border-selected'

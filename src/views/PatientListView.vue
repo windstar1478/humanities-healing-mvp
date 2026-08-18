@@ -144,7 +144,7 @@ function reset() {
 
         <!-- 걸린 필터가 있으면 accent로 켜 둔다 — '선택 상태'에 해당한다 -->
         <button
-          class="flex h-11 w-[92px] shrink-0 items-center gap-3 rounded-lg border border-border-default px-2"
+          class="flex h-11 w-[92px] shrink-0 items-center gap-3 rounded-lg border border-border-default px-2 active:bg-surface-pressed"
           @click="openPanel = openPanel === 'filter' ? null : 'filter'"
         >
           <span
@@ -158,7 +158,7 @@ function reset() {
         </button>
 
         <button
-          class="flex h-11 w-[157px] shrink-0 items-center gap-3 rounded-lg border border-border-default px-2"
+          class="flex h-11 w-[157px] shrink-0 items-center gap-3 rounded-lg border border-border-default px-2 active:bg-surface-pressed"
           @click="openPanel = openPanel === 'sort' ? null : 'sort'"
         >
           <span class="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-text-secondary">
@@ -176,10 +176,11 @@ function reset() {
           <button
             v-for="chip in chips"
             :key="chip.id"
-            class="flex h-11 items-center"
+            class="group flex h-11 items-center"
             @click="clearDimension(chip.id)"
           >
-            <span class="flex h-8 items-center gap-1 rounded-2xl border border-border-selected bg-selected-bg py-2 pl-3 pr-2 text-label font-medium text-interactive-default">
+            <!-- 선택된 자리라 selected-bg-pressed로 눌러 accent를 잃지 않는다 -->
+            <span class="flex h-8 items-center gap-1 rounded-2xl border border-border-selected bg-selected-bg py-2 pl-3 pr-2 text-label font-medium text-interactive-default group-active:bg-selected-bg-pressed">
               {{ chip.label }}
               <X :size="12" class="shrink-0" />
             </span>
@@ -312,7 +313,9 @@ function reset() {
         class="flex h-11 w-full items-center justify-between gap-2 px-3 text-left text-label"
         :class="[
           i > 0 ? 'border-t border-border-subtle' : '',
-          sortKey === option.key ? 'bg-selected-bg' : '',
+          sortKey === option.key
+            ? 'bg-selected-bg active:bg-selected-bg-pressed'
+            : 'active:bg-surface-pressed',
         ]"
         @click="sortKey = option.key; openPanel = null"
       >
@@ -331,7 +334,9 @@ function reset() {
           v-for="key in dimension.keys"
           :key="key"
           class="flex h-11 w-full items-center justify-between gap-2 px-3 text-left text-label"
-          :class="filters[dimension.id].includes(key) ? 'bg-selected-bg' : ''"
+          :class="filters[dimension.id].includes(key)
+            ? 'bg-selected-bg active:bg-selected-bg-pressed'
+            : 'active:bg-surface-pressed'"
           @click="toggle(dimension.id, key)"
         >
           <span>{{ key }}</span>

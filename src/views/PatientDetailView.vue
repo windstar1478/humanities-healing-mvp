@@ -1,9 +1,9 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, nextTick } from 'vue'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Check, Play, User,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Plus, Search, Pencil, Trash2,
 } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import {
@@ -11,6 +11,9 @@ import {
   processHistory, CURRENT_VERSION,
   keyMetrics, metricPoints, metricSeries, SCALE_SPAN, SCALE_STEPS,
 } from '../mocks/process.js'
+import { notesOf, addNote, updateNote, removeNote } from '../mocks/notes.js'
+import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
+import NoteDeleteModal from '../components/NoteDeleteModal.vue'
 
 /*
  * 환자 상세 (Figma 130:3152 · 148:5384).
@@ -92,9 +95,174 @@ const linePath = computed(() =>
   series.value.map((v, i) => `${i ? 'L' : 'M'}${xAt(i)},${yAt(v)}`).join(' '),
 )
 
-function goBack() {
-  router.push({ path: '/patients/list' })
+/* ── 개인 메모 (Figma 188:5004 · 189:8675 · 190:8960) ─────────────
+ * 오토세이브가 없다. 편집 중 이탈은 전부 미저장 경고를 거친다.
+ */
+const noteQuery = ref('')
+
+const visibleNotes = computed(() => {
+  const all = patient.value ? notesOf(patient.value.id) : []
+  const q = noteQuery.value.trim()
+  if (!q) return all
+  /* 본문과 날짜 둘 다 본다 — 플레이스홀더가 '메모 내용 · 날짜로 검색'이다 */
+  return all.filter((n) => n.body.includes(q) || n.date.includes(q))
+})
+
+/*
+ * 편집 상태. `editingId`가 'new'면 아직 저장되지 않은 새 메모다.
+ * 새 메모도 카드 하나가 편집 상태로 열리는 것이라 같은 자리를 쓴다.
+ */
+const editingId = ref(null)
+const draft = ref('')
+const draftOrigin = ref('')
+const editorRef = ref(null)
+
+/*
+ * 새 메모도 카드 하나가 편집 상태로 열리는 것이라, 목록 맨 앞에 임시 카드를 끼워
+ * 같은 v-for가 처리하게 한다. 마크업을 두 벌 두면 한쪽만 고쳐진다.
+ */
+const noteCards = computed(() =>
+  editingId.value === 'new'
+    ? [{ id: 'new', date: today(), context: currentContext.value, body: '' }, ...visibleNotes.value]
+    : visibleNotes.value,
+)
+
+/* 편집 카드는 v-for 안에 있어 ref가 배열로 들어온다 */
+function focusEditor() {
+  nextTick(() => {
+    const el = editorRef.value
+    ;(Array.isArray(el) ? el[0] : el)?.focus()
+  })
 }
+
+const isDirty = computed(() => editingId.value !== null && draft.value !== draftOrigin.value)
+
+/* 무엇이 사라지는지 경고 문구에 넣는다 */
+const editingSubject = computed(() => {
+  if (editingId.value === 'new') return '새 메모'
+  const note = visibleNotes.value.find((n) => n.id === editingId.value)
+  return note ? `${note.date} 메모` : '메모'
+})
+
+/*
+ * 새 메모의 맥락 태그는 환자의 현재 단계를 따른다.
+ * 메모를 쓴 시점이 프로세스의 어디였는지가 나중에 읽을 때의 단서이기 때문이다.
+ */
+const currentContext = computed(() => {
+  const step = PROCESS_STEPS[currentStep.value]
+  if (isRunning.value && step === '프로그램 수행') return `${step} · ${SESSION_CURRENT}회차`
+  return patient.value?.status ?? step
+})
+
+const today = () => {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`
+}
+
+function startEdit(note) {
+  editingId.value = note.id
+  draft.value = note.body
+  draftOrigin.value = note.body
+  focusEditor()
+}
+
+function startNew() {
+  editingId.value = 'new'
+  draft.value = ''
+  draftOrigin.value = ''
+  focusEditor()
+}
+
+function saveEdit() {
+  const body = draft.value.trim()
+  /* 빈 메모는 남기지 않는다. 새 메모면 그대로 버리고, 기존 메모는 건드리지 않는다 */
+  if (body) {
+    if (editingId.value === 'new') {
+      addNote({
+        patientId: patient.value.id,
+        date: today(),
+        context: currentContext.value,
+        body,
+      })
+    } else {
+      updateNote(editingId.value, body)
+    }
+  }
+  closeEdit()
+}
+
+function closeEdit() {
+  editingId.value = null
+  draft.value = ''
+  draftOrigin.value = ''
+}
+
+/*
+ * 미저장 경고. 편집 중에 다른 곳으로 가려는 조작은 전부 guard를 통과한다 —
+ * 탭 전환 · 다른 메모 편집 · 새 메모 · 삭제 · 화면 이탈.
+ * 경고를 한 자리에 모아두지 않으면 어느 한 경로만 빠져나간다.
+ */
+const pendingAction = ref(null)
+
+function guard(action) {
+  if (!isDirty.value) {
+    if (editingId.value !== null) closeEdit()
+    action()
+    return
+  }
+  pendingAction.value = action
+}
+
+function runPending() {
+  const action = pendingAction.value
+  pendingAction.value = null
+  closeEdit()
+  action?.()
+}
+
+function discardAndRun() {
+  runPending()
+}
+
+function saveAndRun() {
+  const body = draft.value.trim()
+  if (body) {
+    if (editingId.value === 'new') {
+      addNote({ patientId: patient.value.id, date: today(), context: currentContext.value, body })
+    } else {
+      updateNote(editingId.value, body)
+    }
+  }
+  runPending()
+}
+
+/* 삭제 확인 */
+const deleting = ref(null)
+
+function confirmDelete() {
+  removeNote(deleting.value.id)
+  deleting.value = null
+}
+
+function selectTab(id) {
+  guard(() => { tab.value = id })
+}
+
+function goBack() {
+  guard(() => router.push({ path: '/patients/list' }))
+}
+
+/*
+ * 라우터로 빠져나가는 경로도 막는다. 모달이 쿼리를 붙이며 일으키는 이동은
+ * 같은 화면 안이라 통과시킨다 — 여기서 막으면 경고 모달 자신이 열리지 못한다.
+ */
+onBeforeRouteLeave((to, from) => {
+  if (to.path === from.path) return true
+  if (!isDirty.value) return true
+  pendingAction.value = () => router.push(to.fullPath)
+  return false
+})
 </script>
 
 <template>
@@ -221,8 +389,8 @@ function goBack() {
           class="flex h-11 items-center justify-center py-1 text-label"
           :class="tab === item.id
             ? 'border-b border-border-selected font-bold text-interactive-default'
-            : 'font-medium text-text-secondary'"
-          @click="tab = item.id"
+            : 'font-medium text-text-secondary active:text-text-primary'"
+          @click="selectTab(item.id)"
         >
           {{ item.label }}
         </button>
@@ -231,11 +399,18 @@ function goBack() {
       <!-- 프로세스 히스토리 -->
       <div v-if="tab === 'history'" class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
         <div v-for="entry in processHistory" :key="entry.id" class="shrink-0">
+          <!--
+            펼쳐지면 머리와 본문이 **한 상자**가 된다.
+            둘 다 온전한 라운드 상자로 두면 맞닿는 자리에 선이 겹치고 모서리가 네 개
+            생겨, 정작 중요하지 않은 경계가 제일 눈에 띈다.
+            머리는 아래 라운드와 아래 테두리를 걷고, 본문은 위쪽을 걷는다.
+            둘 사이는 배경색 차이만으로 나뉜다.
+          -->
           <button
-            class="flex h-11 w-full items-center gap-2.5 rounded-lg border px-2"
+            class="flex h-11 w-full items-center gap-2.5 border px-2"
             :class="openHistory === entry.id
-              ? 'border-border-default bg-selected-bg'
-              : 'border-border-default bg-surface-field'"
+              ? 'rounded-t-lg border-b-0 border-border-selected bg-selected-bg active:bg-selected-bg-pressed'
+              : 'rounded-lg border-border-default bg-surface-field active:bg-surface-pressed'"
             @click="openHistory = openHistory === entry.id ? null : entry.id"
           >
             <component
@@ -257,7 +432,7 @@ function goBack() {
 
           <div
             v-if="openHistory === entry.id"
-            class="-mt-px flex gap-2.5 rounded-lg border border-border-default p-3"
+            class="flex gap-2.5 rounded-b-lg border border-t-0 border-border-selected p-3"
           >
             <template v-if="entry.entries.length">
               <span class="flex shrink-0 flex-col justify-center gap-3 text-count text-text-secondary">
@@ -290,8 +465,8 @@ function goBack() {
             :key="metric.id"
             class="flex flex-1 flex-col items-start gap-1 rounded-lg border px-2 py-0.5 text-left"
             :class="selectedMetric === metric.id
-              ? 'border-border-selected bg-selected-bg'
-              : 'border-border-default'"
+              ? 'border-border-selected bg-selected-bg active:bg-selected-bg-pressed'
+              : 'border-border-default active:bg-surface-pressed'"
             @click="selectedMetric = metric.id"
           >
             <span class="w-full truncate text-label font-medium text-text-secondary">{{ metric.label }}</span>
@@ -385,11 +560,121 @@ function goBack() {
         </div>
       </div>
 
-      <!-- 개인 메모. Figma 디자인이 아직 없다 -->
-      <div v-else class="flex min-h-0 flex-1 items-center justify-center">
-        <p class="text-body text-text-disabled">개인 메모는 아직 준비 중입니다</p>
+      <!-- 개인 메모 (Figma 188:5004) -->
+      <div v-else class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden">
+        <!-- 새 메모 + 검색 -->
+        <div class="flex shrink-0 items-center gap-2.5">
+          <button
+            class="flex h-11 shrink-0 items-center justify-center gap-1 rounded-lg border border-border-default p-2 text-body text-text-secondary active:bg-surface-pressed"
+            @click="guard(startNew)"
+          >
+            <Plus :size="20" class="shrink-0" />
+            <span>새 메모</span>
+          </button>
+          <label class="flex h-11 min-w-0 flex-1 items-center gap-4 rounded-lg border border-border-default bg-surface-field px-3">
+            <Search :size="20" class="shrink-0 text-text-secondary" />
+            <input
+              v-model="noteQuery"
+              type="text"
+              placeholder="메모 내용 · 날짜로 검색"
+              class="min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-disabled"
+            />
+          </label>
+        </div>
+
+        <!--
+          카드 2열. 편집 중인 카드만 커지므로 items-start로 위를 맞춘다 —
+          늘어나면 옆 카드까지 같이 커져 목록이 출렁인다
+        -->
+        <div v-if="noteCards.length" class="grid min-h-0 flex-1 grid-cols-2 items-start gap-2.5 overflow-y-auto">
+          <template v-for="note in noteCards" :key="note.id">
+            <!-- 편집 중: 카드가 커지고 테두리가 accent로 바뀐다 (새 메모도 같은 카드다) -->
+            <div
+              v-if="editingId === note.id"
+              class="flex flex-col gap-2 rounded-lg border border-border-selected px-3 pb-2"
+            >
+              <div class="flex h-11 items-center gap-1">
+                <span class="shrink-0 text-label font-medium text-text-secondary">{{ note.date }}</span>
+                <span class="truncate text-caption text-text-secondary">{{ note.context }}</span>
+                <span class="flex-1 shrink-0 text-right text-label font-medium text-text-secondary">편집 중</span>
+              </div>
+              <textarea
+                ref="editorRef"
+                v-model="draft"
+                class="h-[53px] w-full resize-none rounded border border-border-default bg-transparent p-2 text-label text-text-primary outline-none"
+              ></textarea>
+              <div class="flex items-center justify-end gap-2.5">
+                <button
+                  class="flex h-9 items-center justify-center rounded-lg border border-border-default px-3 py-2 text-body text-text-primary active:bg-surface-pressed"
+                  @click="guard(closeEdit)"
+                >
+                  취소
+                </button>
+                <button
+                  class="flex h-9 items-center justify-center rounded-lg bg-surface-inverse px-3 py-2 text-body text-text-inverse active:bg-surface-inverse-pressed"
+                  @click="saveEdit"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+
+            <!-- 평소 -->
+            <!--
+              좌우 패딩을 대칭으로 둔다. 아이콘 묶음만 음수 마진으로 오른쪽 끝까지
+              밀어, 44 히트 영역은 그대로 두면서 아이콘의 시각 위치를 Figma에 맞춘다
+            -->
+            <div v-else class="flex flex-col gap-2.5 rounded-lg border border-border-default px-3 pb-2">
+              <div class="flex h-11 items-center gap-1">
+                <span class="flex min-w-0 flex-1 items-end gap-1">
+                  <span class="shrink-0 text-label font-medium text-text-secondary">{{ note.date }}</span>
+                  <span class="truncate text-caption text-text-secondary">{{ note.context }}</span>
+                </span>
+                <span class="-mr-2 flex shrink-0 items-center gap-1">
+                  <button
+                    class="flex size-11 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed"
+                    @click="guard(() => startEdit(note))"
+                  >
+                    <Pencil :size="16" />
+                  </button>
+                  <button
+                    class="flex size-11 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed"
+                    @click="guard(() => { deleting = note })"
+                  >
+                    <Trash2 :size="16" />
+                  </button>
+                </span>
+              </div>
+              <!-- 두 줄까지 보여준다. 한 줄이면 뒷부분을 편집으로 들어가야만 읽을 수 있다 -->
+              <p class="line-clamp-2 text-label text-text-primary">{{ note.body }}</p>
+            </div>
+          </template>
+        </div>
+
+        <div v-else class="flex min-h-0 flex-1 items-center justify-center">
+          <p class="text-body text-text-disabled">
+            {{ noteQuery.trim() ? '검색 결과가 없습니다' : '작성된 메모가 없습니다' }}
+          </p>
+        </div>
       </div>
     </section>
+
+    <!-- 삭제는 되돌릴 수 없다. 반드시 확인을 거친다 -->
+    <NoteDeleteModal
+      v-if="deleting"
+      :note="deleting"
+      @confirm="confirmDelete"
+      @close="deleting = null"
+    />
+
+    <!-- 편집 중 이탈 경고. 탭 전환 · 다른 메모 · 화면 이탈이 모두 여기로 모인다 -->
+    <UnsavedWarningModal
+      v-if="pendingAction"
+      :subject="editingSubject"
+      @discard="discardAndRun"
+      @save="saveAndRun"
+      @close="pendingAction = null"
+    />
   </div>
 
   <div v-else class="flex flex-1 items-center justify-center">

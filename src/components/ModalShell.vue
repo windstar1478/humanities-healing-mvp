@@ -18,6 +18,17 @@ import { useRoute, useRouter } from 'vue-router'
 const props = defineProps({
   /* route.query.modal에 남길 이름 */
   name: { type: String, required: true },
+  /*
+   * 'modal' — 폭 360 / 라운드 16 / 본문 스크롤 + 하단 고정 버튼 행.
+   *           배치 확인 · 일정 추가 · 작업 추가 · 작업 상세가 여기 해당한다.
+   * 'alert'  — 폭 402 / 라운드 8 / 짧은 확인 한 덩어리 (Figma 186:6839 · 190:9039).
+   *           내용이 짧아 스크롤도 구분선도 필요 없고, 버튼 배치도 경고마다 다르다.
+   *           그래서 셸은 상자만 잡고 안쪽은 통째로 슬롯에 맡긴다.
+   *
+   * 갈라진 것은 상자 모양뿐이고 history 처리는 아래 한 벌을 그대로 공유한다.
+   * 경고 모달이라고 history를 따로 짜면 뒤로가기 동작이 한쪽만 틀어진다.
+   */
+  variant: { type: String, default: 'modal' },
 })
 
 const emit = defineEmits(['close'])
@@ -47,10 +58,22 @@ defineExpose({ dismiss })
     <div
       class="fixed inset-0 z-50 flex items-center justify-center p-6"
       :style="{ backgroundColor: 'var(--scrim)' }"
-      @click.self="dismiss"
+      @click.self="variant === 'modal' ? dismiss() : null"
     >
+      <!--
+        alert은 스크림 탭으로 닫지 않는다. 되돌릴 수 없는 조작(삭제)이나
+        데이터가 걸린 갈림길(미저장 이탈)이라 선택지 중 하나를 명시적으로
+        골라야 한다. 뒤로가기는 그대로 열려 있다
+      -->
+      <div
+        v-if="variant === 'alert'"
+        class="flex max-h-full w-[402px] flex-col overflow-hidden rounded-lg border border-border-default bg-surface-card px-3 py-2"
+      >
+        <slot :dismiss="dismiss" />
+      </div>
+
       <!-- 내용이 길어져도 화면을 넘기지 않는다. 본문만 스크롤하고 버튼은 고정 -->
-      <div class="flex max-h-full w-[360px] flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card">
+      <div v-else class="flex max-h-full w-[360px] flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-card">
         <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <slot :dismiss="dismiss" />
         </div>
