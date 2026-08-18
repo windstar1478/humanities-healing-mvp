@@ -4,9 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ClipboardList, CalendarDays, Users, TrendingUp, PenTool,
   Bell, Settings, Sun, Moon,
-  Search, User, ChevronRight, ArrowUpDown,
+  Search, User, ChevronRight, ArrowUpDown, Check, X,
 } from 'lucide-vue-next'
 import { recentPatients, allPatients } from './mocks/patients.js'
+import { dimensions } from './mocks/analysis.js'
+import { visitsOf } from './scheduleState.js'
 import {
   dragState, startPress, trackPress, trackDrag, endPress, cancelDrag, clearRejected,
   swallowDragClick, beginGesture,
@@ -72,6 +74,95 @@ function isCurrent(to) {
 const router = useRouter()
 function openPatient(patient) {
   router.push({ path: `/patients/detail/${patient.id}` })
+}
+
+/*
+ * 패널의 '전체 환자' 정렬.
+ *
+ * 기준은 **전체 환자 리스트 화면과 같은 둘**이다. 같은 명단을 두 자리에서 보는데
+ * 정렬 기준이 다르면 같은 '전체 환자'가 두 순서를 갖는다. 기본값도 가나다순으로
+ * 맞췄다 — 목업 배열 순서는 아무 뜻이 없어 읽는 사람이 기준을 짐작할 수 없다.
+ *
+ * **명단 자체를 정렬하지 않는다.** allPatients는 명단 원본을 그대로 참조하므로
+ * 여기서 sort()를 걸면 '최근 환자'(앞 3명)까지 같이 바뀐다.
+ */
+const PATIENT_SORTS = [
+  { key: 'name', label: '가나다순' },
+  { key: 'recent', label: '최근 진료순' },
+  { key: 'condition', label: '진단순' },
+]
+const patientSort = ref('name')
+
+/*
+ * 진단의 나열 순서는 분석 화면의 진단 축과 같은 배열에서 온다.
+ * 여기에 순서를 다시 적으면 차트의 막대 순서와 패널의 정렬이 갈라진다.
+ */
+const CONDITION_ORDER = dimensions.find((d) => d.id === 'condition').keys
+const sortOpen = ref(false)
+/* 팝오버는 패널 밖으로 나가야 한다 — aside가 overflow-y-auto라 안에 두면 잘린다 */
+const sortAnchor = ref(null)
+
+const byName = (a, b) => a.name.localeCompare(b.name, 'ko')
+
+const sortedPatients = computed(() => {
+  const list = [...allPatients]
+  if (patientSort.value === 'name') return list.sort(byName)
+  /* 같은 진단 안에서는 가나다순이다. 기준이 없으면 순서가 매번 달라 보인다 */
+  if (patientSort.value === 'condition') {
+    return list.sort((a, b) =>
+      CONDITION_ORDER.indexOf(a.condition) - CONDITION_ORDER.indexOf(b.condition) || byName(a, b))
+  }
+  /* 진료가 없는 사람은 뒤로 보낸다 — 최근이라 할 것이 없다. 리스트 화면과 같은 규칙 */
+  return list
+    .map((patient) => ({ patient, last: visitsOf(patient.name).last }))
+    .sort((a, b) => {
+      if (a.last === b.last) return 0
+      if (!a.last) return 1
+      if (!b.last) return -1
+      return a.last < b.last ? 1 : -1
+    })
+    .map((row) => row.patient)
+})
+
+/*
+ * 패널의 환자 검색.
+ *
+ * **패널 안에서 거른다.** 리스트 화면으로 보내면 검색 결과를 꾹 눌러 일정에
+ * 배치하는 길이 끊긴다 — 패널의 존재 이유가 어느 화면에서든 환자를 집어 오는 것이다.
+ * 검색 중에는 두 구간을 합쳐 `검색 결과` 하나로 보여준다. 배치 모달의 환자
+ * 리스트와 같은 문법이다(그쪽이 패널 구조를 그대로 옮겨 온 것이다).
+ */
+const patientQuery = ref('')
+const searching = computed(() => patientQuery.value.trim().length > 0)
+
+const searchResults = computed(() => {
+  const q = patientQuery.value.trim()
+  return sortedPatients.value.filter((p) => p.name.includes(q) || p.condition.includes(q))
+})
+
+/* 한 벌의 행 마크업이 세 구간을 다 그린다. 구간마다 복제하면 한쪽만 고쳐진다 */
+const panelSections = computed(() => {
+  if (searching.value) {
+    return [{ key: 'result', label: '검색 결과', items: searchResults.value }]
+  }
+  return [
+    { key: 'recent', label: '최근 환자', items: recentPatients },
+    { key: 'all', label: '전체 환자', items: sortedPatients.value },
+  ]
+})
+
+function toggleSort(event) {
+  if (sortOpen.value) {
+    sortOpen.value = false
+    return
+  }
+  const r = event.currentTarget.getBoundingClientRect()
+  const WIDTH = 157
+  sortAnchor.value = {
+    left: `${Math.max(24, r.right - WIDTH)}px`,
+    top: `${r.bottom + 4}px`,
+  }
+  sortOpen.value = true
 }
 
 const isDark = ref(false)
@@ -195,74 +286,118 @@ onUnmounted(() => {
       v-if="!$route.meta.noPatientPanel"
       class="flex w-[274px] shrink-0 flex-col gap-1 overflow-y-auto rounded-2xl bg-surface-container px-6 py-4"
     >
-      <!-- 검색 -->
-      <button class="mx-3 flex h-11 shrink-0 items-center gap-4 rounded-lg border border-border-default bg-surface-field px-3 text-text-disabled active:bg-surface-pressed">
-        <Search :size="20" class="shrink-0" />
-        <span class="text-body">환자 검색</span>
-      </button>
-
-      <!-- 최근 환자 -->
-      <section class="flex shrink-0 flex-col gap-2 pl-3 pt-1 pb-3">
-        <h2 class="flex h-11 items-center pl-1 text-label font-medium text-text-secondary">최근 환자</h2>
+      <!-- 검색. 패널 안에서 거르므로 결과도 그대로 꾹 눌러 배치할 수 있다 -->
+      <label class="mx-3 flex h-11 shrink-0 items-center gap-4 rounded-lg border border-border-default bg-surface-field px-3">
+        <Search :size="20" class="shrink-0 text-text-disabled" />
+        <input
+          v-model="patientQuery"
+          type="text"
+          placeholder="환자 검색"
+          class="min-w-0 flex-1 bg-transparent text-body text-text-primary placeholder:text-text-disabled"
+        />
         <button
-          v-for="p in recentPatients"
-          :key="p.id"
-          class="flex touch-manipulation select-none items-center gap-2 rounded-lg py-2 pl-1 text-left transition-colors duration-100 ease-standard active:bg-surface-pressed"
-          :class="dragState.item?.id === p.id ? 'bg-surface-pressed' : ''"
-          @pointerdown="startPress($event, p, 'patient')"
-          @pointermove="trackPress"
-          @pointercancel="cancelDrag"
-          @contextmenu.prevent
-          @click="openPatient(p)"
+          v-if="searching"
+          class="-mr-1 flex size-8 shrink-0 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed"
+          @click="patientQuery = ''"
         >
-          <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
-            <User :size="24" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-1">
-            <span class="truncate text-title-sm font-semibold"
-              >{{ p.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ p.age }}·{{ p.sex }}</span></span>
-            <span class="truncate text-label font-medium"
-              >{{ p.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ p.status }}</span></span>
-          </span>
+          <X :size="16" />
         </button>
-      </section>
+      </label>
 
-      <div class="h-px shrink-0 bg-border-default"></div>
+      <!--
+        구간은 검색 여부로 갈린다 — 평소엔 최근 환자 + 전체 환자, 검색 중에는
+        둘을 합친 검색 결과 하나다. 행 마크업은 한 벌이라 구간마다 갈라지지 않는다.
+      -->
+      <template v-for="(group, i) in panelSections" :key="group.key">
+        <div v-if="i > 0" class="h-px shrink-0 bg-border-default"></div>
 
-      <!-- 전체 환자 -->
-      <section class="flex shrink-0 flex-col gap-2 pl-3 pt-2 pb-3">
-        <!-- 행 텍스트는 우측 여백까지 쓰지만, 헤더의 정렬 버튼은 안쪽에 둔다 -->
-        <div class="flex h-11 items-center gap-2 pl-1 pr-3">
-          <h2 class="text-label font-medium text-text-secondary">전체 환자</h2>
-          <ChevronRight :size="16" class="shrink-0 text-text-secondary" />
-          <div class="flex-1"></div>
-          <button class="flex size-11 shrink-0 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed">
-            <ArrowUpDown :size="16" />
+        <section class="flex shrink-0 flex-col gap-2 pl-3 pb-3" :class="i > 0 ? 'pt-2' : 'pt-1'">
+          <!-- 전체 환자 머리만 진입점과 정렬을 갖는다 -->
+          <div v-if="group.key === 'all'" class="flex h-11 items-center gap-2 pl-1 pr-3">
+            <!--
+              머리를 누르면 전체 환자 리스트로 간다. chevron이 이미 '더 있다'고
+              말하고 있어서 눌리지 않으면 고장으로 읽힌다. 탭 = 탐색이라 버튼이 아니라
+              행 전체가 대상이고, 정렬 버튼만 따로 떼어 둔다
+            -->
+            <button
+              class="-ml-1 flex h-11 items-center gap-2 rounded-lg px-1 active:bg-surface-pressed"
+              @click="router.push({ path: '/patients/list' })"
+            >
+              <h2 class="text-label font-medium text-text-secondary">{{ group.label }}</h2>
+              <ChevronRight :size="16" class="shrink-0 text-text-secondary" />
+            </button>
+            <div class="flex-1"></div>
+            <button
+              class="flex size-11 shrink-0 items-center justify-center rounded-lg active:bg-surface-pressed"
+              :class="sortOpen ? 'text-interactive-default' : 'text-text-secondary'"
+              @click="toggleSort"
+            >
+              <ArrowUpDown :size="16" />
+            </button>
+          </div>
+          <h2 v-else class="flex h-11 items-center gap-1 pl-1 text-label font-medium text-text-secondary">
+            {{ group.label }}
+            <span v-if="group.key === 'result'" class="text-count">{{ group.items.length }}</span>
+          </h2>
+
+          <button
+            v-for="p in group.items"
+            :key="p.id"
+            class="flex touch-manipulation select-none items-center gap-2 rounded-lg py-2 pl-1 text-left transition-colors duration-100 ease-standard active:bg-surface-pressed"
+            :class="dragState.item?.id === p.id ? 'bg-surface-pressed' : ''"
+            @pointerdown="startPress($event, p, 'patient')"
+            @pointermove="trackPress"
+            @pointercancel="cancelDrag"
+            @contextmenu.prevent
+            @click="openPatient(p)"
+          >
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
+              <User :size="24" />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col gap-1">
+              <span class="truncate text-title-sm font-semibold"
+                >{{ p.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ p.age }}·{{ p.sex }}</span></span>
+              <span class="truncate text-label font-medium"
+                >{{ p.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ p.status }}</span></span>
+            </span>
           </button>
-        </div>
-        <button
-          v-for="p in allPatients"
-          :key="p.id"
-          class="flex touch-manipulation select-none items-center gap-2 rounded-lg py-2 pl-1 text-left transition-colors duration-100 ease-standard active:bg-surface-pressed"
-          :class="dragState.item?.id === p.id ? 'bg-surface-pressed' : ''"
-          @pointerdown="startPress($event, p, 'patient')"
-          @pointermove="trackPress"
-          @pointercancel="cancelDrag"
-          @contextmenu.prevent
-          @click="openPatient(p)"
-        >
-          <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-canvas text-text-secondary">
-            <User :size="24" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-1">
-            <span class="truncate text-title-sm font-semibold"
-              >{{ p.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ p.age }}·{{ p.sex }}</span></span>
-            <span class="truncate text-label font-medium"
-              >{{ p.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ p.status }}</span></span>
-          </span>
-        </button>
-      </section>
+
+          <p v-if="!group.items.length" class="py-2 pl-1 text-label text-text-secondary">
+            찾는 환자가 없습니다
+          </p>
+        </section>
+      </template>
     </aside>
+
+    <!--
+      정렬 팝오버. 가벼운 콘텐츠라 외부 탭으로 닫고 history entry를 만들지 않는다.
+      패널이 스크롤 상자라 안에 두면 잘려서 body로 내보낸다.
+      Figma에 열린 상태가 없어 초안이다 — 전체 환자 리스트의 것과 같은 모양이다.
+    -->
+    <Teleport to="body">
+      <div v-if="sortOpen" class="fixed inset-0 z-40" @click="sortOpen = false"></div>
+      <div
+        v-if="sortOpen"
+        class="fixed z-40 w-[157px] overflow-hidden rounded-lg border border-border-default bg-surface-card"
+        :style="sortAnchor"
+      >
+        <button
+          v-for="(option, i) in PATIENT_SORTS"
+          :key="option.key"
+          class="flex h-11 w-full items-center justify-between gap-2 px-3 text-left text-label"
+          :class="[
+            i > 0 ? 'border-t border-border-subtle' : '',
+            patientSort === option.key
+              ? 'bg-selected-bg active:bg-selected-bg-pressed'
+              : 'active:bg-surface-pressed',
+          ]"
+          @click="patientSort = option.key; sortOpen = false"
+        >
+          <span>{{ option.label }}</span>
+          <Check v-if="patientSort === option.key" :size="16" class="shrink-0 text-text-secondary" />
+        </button>
+      </div>
+    </Teleport>
 
     <!-- 집어 든 대상이 손가락을 따라온다. 초안 — Figma 정의 없음 -->
     <Teleport to="body">

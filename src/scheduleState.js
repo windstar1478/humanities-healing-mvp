@@ -47,6 +47,16 @@ export function setTaskDone(id, done) {
   if (task) task.done = done
 }
 
+/*
+ * 삭제는 완료와 다르다. 완료는 '했다'는 기록이라 목록 아래 구간에 남지만,
+ * 삭제는 애초에 없었던 것으로 만든다 — 잘못 만든 작업을 치우는 길이다.
+ * 타임라인의 업무 블록은 작업에서 파생하므로 여기서 지우면 같이 사라진다.
+ */
+export function removeTask(id) {
+  const at = taskState.items.findIndex((t) => t.id === id)
+  if (at >= 0) taskState.items.splice(at, 1)
+}
+
 /* 배치는 작업에 날짜·시간을 채우는 일이다. 새 이벤트를 만들지 않는다 */
 export function placeTask(id, key, hour) {
   const task = findTask(id)

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Search, ArrowUpDown, ChevronDown, ChevronRight, Check, SearchX } from 'lucide-vue-next'
 import { processLibrary, PROCESS_SORTS } from '../mocks/processLibrary.js'
+import { recordAssignment } from '../mocks/process.js'
 import ProcessDetailModal from './ProcessDetailModal.vue'
 
 /*
@@ -47,6 +48,8 @@ const rows = computed(() => {
 function onClose(process) {
   detail.value = null
   if (!process) return
+  /* 이력을 먼저 남긴다 — 환자 레코드를 고친 뒤면 직전 상태(중단/진행 중)를 알 수 없다 */
+  recordAssignment(props.patient, process)
   props.patient.processId = process.id
   props.patient.processName = process.name
   props.patient.process = '진행 중'

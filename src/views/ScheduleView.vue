@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 import { calendarMonth } from '../mocks/calendar.js'
 import { findPatientByName } from '../mocks/patients.js'
 import { dayLabel, TODAY_KEY, NOW_HOUR } from '../mocks/schedule.js'
-import { monthCells, canDropOn, findTask, removeEvent } from '../scheduleState.js'
+import { monthCells, canDropOn, findTask, removeEvent, removeTask } from '../scheduleState.js'
 import { dragState } from '../dragState.js'
 import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
 import TaskDetailModal from '../components/TaskDetailModal.vue'
@@ -152,6 +152,14 @@ const deletingEvent = ref(null)
 function confirmDeleteEvent() {
   removeEvent(deletingEvent.value.dateKey, deletingEvent.value.event.id)
   deletingEvent.value = null
+}
+
+/* 작업 삭제. 아젠다와 같은 자리·같은 문구다 */
+const deletingTask = ref(null)
+
+function confirmDeleteTask() {
+  removeTask(deletingTask.value.id)
+  deletingTask.value = null
 }
 
 /* 지난 일정은 명도를 낮춘다 — 아젠다와 같은 규칙 */
@@ -374,7 +382,17 @@ function isPastEvent(key, hour) {
     <TaskDetailModal
       v-if="detailTask"
       :task="detailTask"
+      @delete="deletingTask = detailTask"
       @close="detailTask = null"
+    />
+
+    <DeleteConfirmModal
+      v-if="deletingTask"
+      heading="작업을 삭제하시겠습니까?"
+      :detail="`${deletingTask.title} 작업이 삭제됩니다.`"
+      warning="삭제한 작업은 복구할 수 없습니다."
+      @confirm="confirmDeleteTask"
+      @close="deletingTask = null"
     />
 
     <!-- 환자 일정: 상세 → 편집 · 삭제. 아젠다와 같은 문법이다 -->

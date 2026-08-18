@@ -7,8 +7,8 @@ import {
 } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import {
-  PROCESS_STEPS, stepIndexOf, SESSION_TOTAL, SESSION_CURRENT,
-  processHistory, CURRENT_VERSION,
+  PROCESS_STEPS, stepIndexOf, stepStateOf, SESSION_TOTAL, SESSION_CURRENT,
+  processHistory, historyOf, CURRENT_VERSION,
   keyMetrics, metricPoints, metricSeries, SCALE_SPAN, SCALE_STEPS,
 } from '../mocks/process.js'
 import { notesOf, addNote, updateNote, removeNote } from '../mocks/notes.js'
@@ -39,13 +39,31 @@ const isRunning = computed(() => patient.value?.process === '진행 중')
 /* 프로세스 이름은 진단을 따른다 — 게임과몰입 환자에게 PTSD_v1.0이 붙으면 안 된다 */
 const processName = (version) => `${patient.value.condition}_${version}`
 
+/* 판정은 mocks/process.js 한 곳에 있다. 코어 프로세스의 컴팩트 스테퍼와 같은 규칙이다 */
 function stepState(index) {
-  /* 아직 시작하지 않았으면 완료된 단계가 하나도 없다 */
-  if (patient.value.process === '시작 전') return 'waiting'
-  if (!isRunning.value) return index <= currentStep.value ? 'done' : 'waiting'
-  if (index < currentStep.value) return 'done'
-  return index === currentStep.value ? 'current' : 'waiting'
+  return stepStateOf(patient.value, index)
 }
+
+/*
+ * 프로세스로 들어가는 버튼. 화면의 주 행동이라 채움 버튼으로 둔다.
+ *
+ *   시작 전 → 프로세스 시작 (0단계)
+ *   진행 중 → 이어하기 (지금 단계)
+ *   중단    → 프로세스 재시작 (0단계). 중단된 프로세스는 이어붙이지 않고
+ *             처음부터 다시 건다 — "할당 후 변경하려면 재시작해야 한다"는
+ *             프로세스 시작의 확인 문구와 같은 이야기다
+ *   완료    → 갈 곳이 없다. 비활성 버튼을 남기면 무엇을 채워야 열리는지 말할 수
+ *             없고, 노드가 전부 완료라 되짚어 볼 길은 이미 열려 있다
+ *
+ * Figma 화면이 없는 초안이다.
+ */
+const processEntry = computed(() => {
+  if (!patient.value) return null
+  if (patient.value.process === '시작 전') return { label: '프로세스 시작', step: 0 }
+  if (isRunning.value) return { label: '이어하기', step: currentStep.value }
+  if (patient.value.process === '중단') return { label: '프로세스 재시작', step: 0 }
+  return null
+})
 
 const stepStateLabel = { done: '완료', current: '진행 중', waiting: '대기' }
 
@@ -91,6 +109,9 @@ const TABS = [
   { id: 'memo', label: '개인 메모' },
 ]
 const tab = ref('history')
+
+/* 이력은 환자별로 읽는다 — 재할당·재시작으로 닫힌 항목이 여기서 합쳐진다 */
+const history = computed(() => (patient.value ? historyOf(patient.value) : processHistory))
 
 /* 진행 중인 이력만 펼쳐 둔다 */
 const openHistory = ref(processHistory.find((h) => h.state === '진행 중')?.id ?? null)
@@ -327,10 +348,30 @@ onBeforeRouteLeave((to, from) => {
 
     <!-- 프로세스 스테퍼 -->
     <section class="flex shrink-0 flex-col gap-2.5 rounded-lg border border-border-default bg-surface-card px-3 py-2">
-      <p class="flex items-center gap-1 text-text-secondary">
-        <span class="text-caption">프로세스:</span>
-        <span class="text-label font-medium">{{ processName(CURRENT_VERSION) }}</span>
-      </p>
+      <div class="flex items-center gap-2">
+        <p class="flex min-w-0 flex-1 items-center gap-1 text-text-secondary">
+          <span class="text-caption">프로세스:</span>
+          <!-- 아직 붙은 프로세스가 없으면 이름을 지어내지 않는다 -->
+          <span v-if="patient.process === '시작 전'" class="text-label font-medium text-text-disabled">
+            미할당
+          </span>
+          <span v-else class="text-label font-medium">
+            {{ patient.processName ?? processName(CURRENT_VERSION) }}
+          </span>
+        </p>
+
+        <button
+          v-if="processEntry"
+          class="flex h-11 shrink-0 items-center"
+          @click="router.push({ path: `/process/${patient.id}/${processEntry.step}` })"
+        >
+          <!-- 화면의 주 행동이라 채움 버튼이다. 라이트에서 검정, 다크에서 흰색으로 반전된다 -->
+          <span class="flex h-9 items-center gap-1 whitespace-nowrap rounded-lg bg-surface-inverse px-3 text-label font-medium text-text-inverse active:bg-surface-inverse-pressed">
+            {{ processEntry.label }}
+            <ChevronRight :size="16" class="shrink-0" />
+          </span>
+        </button>
+      </div>
 
       <div class="flex justify-center">
         <div class="flex w-[666px] items-start">
@@ -440,7 +481,7 @@ onBeforeRouteLeave((to, from) => {
 
       <!-- 프로세스 히스토리 -->
       <div v-if="tab === 'history'" class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
-        <div v-for="entry in processHistory" :key="entry.id" class="shrink-0">
+        <div v-for="entry in history" :key="entry.id" class="shrink-0">
           <!--
             펼쳐지면 머리와 본문이 **한 상자**가 된다.
             둘 다 온전한 라운드 상자로 두면 맞닿는 자리에 선이 겹치고 모서리가 네 개
@@ -460,8 +501,9 @@ onBeforeRouteLeave((to, from) => {
               :size="16"
               class="shrink-0 text-text-primary"
             />
+            <!-- 실제로 붙은 프로세스는 자기 이름을 갖는다. 목업 이력만 진단에서 짓는다 -->
             <span class="shrink-0 text-label font-medium text-text-primary">
-              {{ processName(entry.id) }}
+              {{ entry.name ?? processName(entry.id) }}
             </span>
             <span class="min-w-0 flex-1 text-left text-count text-text-secondary">{{ entry.state }}</span>
             <span

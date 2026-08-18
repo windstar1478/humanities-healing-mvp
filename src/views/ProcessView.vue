@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Check, Play, User } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
-import { PROCESS_STEPS, stepIndexOf } from '../mocks/process.js'
+import { PROCESS_STEPS, stepIndexOf, stepStateOf } from '../mocks/process.js'
 import InlineCallout from '../components/InlineCallout.vue'
 import ProcessStartStep from '../components/ProcessStartStep.vue'
 
@@ -26,14 +26,10 @@ const patient = computed(() => patients.find((p) => p.id === route.params.id) ??
 const step = computed(() => Number(route.params.step))
 
 const currentStep = computed(() => (patient.value ? stepIndexOf(patient.value) : 0))
-const isRunning = computed(() => patient.value?.process === '진행 중')
 
-/* 환자 상세의 스테퍼와 같은 판정이다. 두 곳이 갈라지면 안 된다 */
+/* 판정은 mocks/process.js 한 곳에 있다. 환자 상세의 큰 스테퍼와 같은 규칙이다 */
 function stepState(index) {
-  if (patient.value.process === '시작 전') return 'waiting'
-  if (!isRunning.value) return index <= currentStep.value ? 'done' : 'waiting'
-  if (index < currentStep.value) return 'done'
-  return index === currentStep.value ? 'current' : 'waiting'
+  return stepStateOf(patient.value, index)
 }
 
 const blocked = ref(null)

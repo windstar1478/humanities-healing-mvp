@@ -1,6 +1,6 @@
 <script setup>
 import { computed, useTemplateRef } from 'vue'
-import { Check } from 'lucide-vue-next'
+import { Check, Trash2 } from 'lucide-vue-next'
 import { taskWhen, setTaskDone } from '../scheduleState.js'
 import ModalShell from './ModalShell.vue'
 
@@ -13,10 +13,29 @@ const props = defineProps({
   task: { type: Object, required: true },
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'delete'])
 
 const shell = useTemplateRef('shell')
 const when = computed(() => taskWhen(props.task))
+
+/*
+ * 삭제 확인은 **이 모달이 완전히 닫힌 뒤에** 연다. 엔트리를 쥔 채로 다음 모달을
+ * 열면 history가 두 겹이 되어 뒤로가기를 두 번 눌러야 화면으로 돌아온다.
+ * 일정 상세와 같은 방식이다 — 선택만 기억해 두고 쿼리가 사라진 뒤에 올린다.
+ */
+let choice = 'close'
+
+function hand(kind) {
+  choice = kind
+  shell.value?.dismiss()
+}
+
+function settle() {
+  const kind = choice
+  choice = 'close'
+  emit(kind)
+  if (kind !== 'close') emit('close')
+}
 
 function toggleDone() {
   setTaskDone(props.task.id, !props.task.done)
@@ -25,7 +44,7 @@ function toggleDone() {
 </script>
 
 <template>
-  <ModalShell ref="shell" name="task" @close="emit('close')">
+  <ModalShell ref="shell" name="task" @close="settle">
     <div class="flex items-start gap-2">
       <h2 class="min-w-0 flex-1 text-title-sm font-semibold">{{ task.title }}</h2>
       <!-- 완료는 개선 표현이므로 경고색을 쓰지 않는다 -->
@@ -66,6 +85,15 @@ function toggleDone() {
     </p>
 
     <template #actions="{ dismiss }">
+      <!--
+        삭제는 되돌릴 수 없어 확인을 한 번 더 거친다. 테두리만 둔 버튼으로 두는 것도
+        일정 상세와 같다 — 파괴적인 것을 강조하지 않는다
+      -->
+      <button class="mr-auto flex h-11 items-center" @click="hand('delete')">
+        <span class="flex h-9 items-center gap-1 rounded-lg border border-border-default px-3 text-body active:bg-surface-pressed">
+          <Trash2 :size="16" />삭제
+        </span>
+      </button>
       <button class="flex h-11 items-center" @click="dismiss">
         <span class="flex h-9 items-center rounded-lg border border-border-default px-3 text-body active:bg-surface-pressed">
           닫기

@@ -6,6 +6,8 @@
  * ⚠️ 확인 필요: 이력 버전과 평가 지표도 Figma 한 명분을 모든 환자에게 그대로 쓴다.
  */
 
+import { reactive } from 'vue'
+
 /* 기본 프로세스. 감정평가가 두 번 나오는 것은 사전·사후이기 때문이다 */
 export const PROCESS_STEPS = [
   '프로세스 시작',
@@ -32,6 +34,23 @@ const STEP_OF_STATUS = {
 
 export function stepIndexOf(patient) {
   return STEP_OF_STATUS[patient.status] ?? 0
+}
+
+/*
+ * 노드 하나의 상태. 환자 상세의 큰 스테퍼와 코어 프로세스의 컴팩트 스테퍼가
+ * **같은 판정을 써야 한다.** 두 곳에 복제돼 있던 것을 여기로 올렸다 —
+ * 시작 전 환자가 아무 단계도 열지 못하던 문제가 양쪽에 똑같이 있었다.
+ *
+ * 시작 전 환자는 완료된 단계가 하나도 없고, **프로세스 시작이 지금 할 차례**다.
+ * 여기를 waiting으로 두면 첫 단계조차 열리지 않아 프로세스를 시작할 길이 없다.
+ * 완료·중단 환자는 '진행 중' 단계가 없다.
+ */
+export function stepStateOf(patient, index) {
+  if (patient.process === '시작 전') return index === 0 ? 'current' : 'waiting'
+  if (patient.process !== '진행 중') return index <= stepIndexOf(patient) ? 'done' : 'waiting'
+  const current = stepIndexOf(patient)
+  if (index < current) return 'done'
+  return index === current ? 'current' : 'waiting'
 }
 
 /* 프로그램 수행 회차. Figma 값(8회차 중 5회차) */
@@ -83,6 +102,61 @@ export const processHistory = [
 
 /* 지금 진행 중인 프로세스의 버전 */
 export const CURRENT_VERSION = 'v1.0'
+
+/*
+ * 프로세스를 새로 할당하면 이력이 바뀐다 — 돌아가던 프로세스는 **종료로 닫히고**
+ * 새 프로세스가 열린다. 중단된 것을 재시작하는 경우도 같다. 끊긴 자리에
+ * 이어붙이지 않고 새 항목을 여는 것이 재시작의 정의이기 때문이다(4.5.1절).
+ *
+ * 위 `processHistory`는 모든 환자가 함께 보는 목업이라 **직접 고치면 안 된다.**
+ * 한 명을 재시작했는데 40명의 이력이 같이 바뀐다. 환자별 변경분만 여기 쌓고
+ * `historyOf`가 읽는 시점에 합친다.
+ */
+const processChanges = reactive({})
+
+function todayDot() {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`
+}
+
+export function recordAssignment(patient, process) {
+  const date = todayDot()
+  processChanges[patient.id] = {
+    closed: {
+      date,
+      /* 왜 닫혔는지가 남아야 나중에 이력을 읽을 때 재시작인지 교체인지 구분된다 */
+      reason: patient.process === '중단' ? '중단 후 재시작' : '재할당으로 종료',
+    },
+    opened: {
+      id: process.id,
+      name: process.name,
+      state: '진행 중',
+      period: `${date} ~`,
+      entries: [{ date, text: '프로세스 시작' }],
+    },
+  }
+}
+
+export function historyOf(patient) {
+  const change = processChanges[patient.id]
+  if (!change) return processHistory
+  /* 돌아가던 항목을 닫는다. 원본은 건드리지 않고 사본을 만든다 */
+  const closed = processHistory.map((entry) => {
+    if (entry.state !== '진행 중') return entry
+    return {
+      ...entry,
+      state: '종료',
+      /* 진행 중 항목의 기간은 `2026.06.12 ~`로 끝난다. 뒤에 종료일을 붙인다 */
+      period: `${entry.period.trim()} ${change.closed.date}`,
+      entries: [
+        ...entry.entries,
+        { date: change.closed.date, label: '프로세스 종료', value: change.closed.reason },
+      ],
+    }
+  })
+  return [...closed, change.opened]
+}
 
 /*
  * 핵심 지표. delta는 사전 대비 변화량이다.

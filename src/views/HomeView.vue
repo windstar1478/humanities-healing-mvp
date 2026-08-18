@@ -8,7 +8,7 @@ import { quickAuthoringItems } from '../mocks/home.js'
 import { findPatientByName } from '../mocks/patients.js'
 import { shiftedKey } from '../mocks/schedule.js'
 import {
-  dayOn, canDropOn, isOpenHour, leadEvent, taskState, taskWhen, findTask, removeEvent,
+  dayOn, canDropOn, isOpenHour, leadEvent, taskState, taskWhen, findTask, removeEvent, removeTask,
 } from '../scheduleState.js'
 import { dragState, startPress, trackPress, cancelDrag } from '../dragState.js'
 import ScheduleEntryModal from '../components/ScheduleEntryModal.vue'
@@ -233,6 +233,14 @@ function openEventDetail(event) {
 function confirmDeleteEvent() {
   removeEvent(deletingEvent.value.dateKey, deletingEvent.value.event.id)
   deletingEvent.value = null
+}
+
+/* 작업 삭제. 배치돼 있으면 타임라인의 업무 블록도 파생이라 같이 사라진다 */
+const deletingTask = ref(null)
+
+function confirmDeleteTask() {
+  removeTask(deletingTask.value.id)
+  deletingTask.value = null
 }
 
 /*
@@ -619,7 +627,17 @@ const rowPopoverStyle = computed(() => {
     <TaskDetailModal
       v-if="detailTask"
       :task="detailTask"
+      @delete="deletingTask = detailTask"
       @close="detailTask = null"
+    />
+
+    <DeleteConfirmModal
+      v-if="deletingTask"
+      heading="작업을 삭제하시겠습니까?"
+      :detail="`${deletingTask.title} 작업이 삭제됩니다.`"
+      warning="삭제한 작업은 복구할 수 없습니다."
+      @confirm="confirmDeleteTask"
+      @close="deletingTask = null"
     />
 
     <!-- 환자 일정: 상세 → 편집 · 삭제 -->
