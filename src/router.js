@@ -35,6 +35,17 @@ export default createRouter({
       component: () => import('./views/ProcessView.vue'),
       meta: { noPatientPanel: true },
     },
+    /*
+     * 설문 수행. 조작자가 상담사가 아니라 환자라서 **셸 전체를 걷는다** —
+     * 좌측 내비도 우측 패널도 없다. meta.bare가 App.vue에서 셸을 통째로 건너뛴다.
+     * 화면 하나만 다르게 두는 것이 아니라 라우트 메타로 선언하는 이유는,
+     * 누락됐을 때의 손실이 가장 큰 화면이기 때문이다.
+     */
+    {
+      path: '/survey/:patientId/:phase/:code',
+      component: () => import('./views/SurveyView.vue'),
+      meta: { bare: true },
+    },
     {
       path: '/effectiveness',
       component: () => import('./views/EffectivenessView.vue'),

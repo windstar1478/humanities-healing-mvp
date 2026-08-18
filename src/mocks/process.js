@@ -32,6 +32,20 @@ const STEP_OF_STATUS = {
   '프로세스 종료': 5,
 }
 
+/*
+ * 단계 번호 → 상태 문자열. 위 표의 역방향이다.
+ * 단계를 넘길 때 환자의 status·nextStep을 여기서 가져간다 —
+ * 화면이 문자열을 직접 적으면 두 표가 갈라진다.
+ */
+export const STATUS_OF_STEP = [
+  '프로세스 시작',
+  '감정평가 (사전)',
+  '프로그램 처방',
+  '프로그램 수행',
+  '감정평가 (사후)',
+  '프로세스 종료',
+]
+
 export function stepIndexOf(patient) {
   return STEP_OF_STATUS[patient.status] ?? 0
 }

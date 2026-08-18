@@ -191,7 +191,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-dvh gap-6 overflow-hidden bg-surface-canvas p-6 text-text-primary">
+  <!--
+    설문 수행 화면은 셸 전체를 걷는다. 조작자가 환자라서 우측 패널에 다른 환자가
+    보여서도 안 되고 좌측 내비로 아무 화면에나 들어갈 수 있어서도 안 된다.
+    우측만 감추면 이탈 경로가 남아 응답이 소실된다.
+  -->
+  <RouterView v-if="$route.meta.bare" />
+
+  <div v-else class="flex h-dvh gap-6 overflow-hidden bg-surface-canvas p-6 text-text-primary">
     <!-- 좌: 네비게이션 -->
 <nav class="flex w-[137px] shrink-0 flex-col overflow-y-auto pt-3">
   <!-- 상단 메뉴 -->

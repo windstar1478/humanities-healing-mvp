@@ -13,32 +13,27 @@
  *    같은 화면의 단계 메타가 `설문 4종`이다.
  */
 
+import { surveys } from './surveys.js'
+
 /* 감정평가 단계는 설문 수가 곧 메타다. 둘이 갈라지지 않게 여기서 센다 */
-const EVAL = (name, surveys) => ({
+const EVAL = (name, items) => ({
   name,
-  meta: `설문 ${surveys.length}종`,
-  items: surveys,
+  meta: `설문 ${items.length}종`,
+  items,
 })
 
 /* 처방·수행 단계. Figma에서 처방은 메타가 비어 있다 */
 const STEP = (name, meta, items) => ({ name, meta, items })
 
-const PTSD_SURVEYS = [
-  { code: 'PCL-5', label: 'PTSD 증상 체크리스트' },
-  { code: 'CAPS-5', label: '임상가 면담 평가' },
-  { code: 'GAD-7', label: '불안 척도' },
-  { code: 'PHQ-9', label: '우울 척도' },
-]
+/*
+ * 설문은 코드만 들고 이름은 `mocks/surveys.js`에서 가져온다.
+ * 이름을 여기 다시 적으면 프로세스 상세 모달과 감정평가 화면이 갈라진다.
+ */
+const pick = (codes) => codes.map((code) => ({ code, label: surveys[code].name }))
 
-const GAME_SURVEYS = [
-  { code: 'IGDS9-SF', label: '단축형 인터넷 게임 장애 척도' },
-  { code: 'YIAS', label: 'Young 인터넷 중독 척도' },
-  { code: 'LEC-5', label: '외상 사건 체크리스트' },
-  { code: 'BDI-II', label: '벡 우울 척도' },
-  { code: 'BAI', label: '벡 불안 척도' },
-  { code: 'K-CBCL', label: '아동·청소년 행동 평가' },
-  { code: 'RSES', label: '자아존중감 척도' },
-]
+const PTSD_SURVEYS = pick(['PCL-5', 'CAPS-5', 'GAD-7', 'WHOQOL-BREF'])
+
+const GAME_SURVEYS = pick(['IGDS9-SF', 'YIAS', 'LEC-5', 'BDI-II', 'BAI', 'K-CBCL', 'RSES'])
 
 /* 프로그램 처방·수행의 내용은 전부 임시값이다 */
 const PTSD_PROGRAMS = [
@@ -146,4 +141,19 @@ export const PROCESS_SORTS = [
 
 export function findProcess(id) {
   return processLibrary.find((p) => p.id === id) ?? null
+}
+
+/*
+ * 이미 진행 중인 환자는 언제 무엇을 할당받았는지가 목업에 없다.
+ * 진단에 맞는 최신 프로세스가 붙어 있다고 보고 떨어뜨린다 —
+ * 이것이 없으면 기존 환자의 감정평가 화면에 설문이 하나도 뜨지 않는다.
+ * ⚠️ 임시값이다. 환자 레코드가 프로세스 id를 들고 오면 걷어낼 것
+ */
+export function processFor(patient) {
+  if (patient.processId) return findProcess(patient.processId)
+  const matched = processLibrary
+    .filter((p) => !p.deprecated && p.condition === patient.condition)
+    .sort((a, b) => b.date.localeCompare(a.date))
+  /* 동반이환처럼 딱 맞는 정의가 없으면 가장 최근 것을 쓴다 */
+  return matched[0] ?? processLibrary.find((p) => !p.deprecated) ?? null
 }

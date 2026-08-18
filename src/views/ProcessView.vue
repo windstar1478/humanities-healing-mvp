@@ -3,9 +3,10 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Check, Play, User } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
-import { PROCESS_STEPS, stepIndexOf, stepStateOf } from '../mocks/process.js'
+import { PROCESS_STEPS, STATUS_OF_STEP, stepIndexOf, stepStateOf } from '../mocks/process.js'
 import InlineCallout from '../components/InlineCallout.vue'
 import ProcessStartStep from '../components/ProcessStartStep.vue'
+import EmotionReviewStep from '../components/EmotionReviewStep.vue'
 
 /*
  * 코어 프로세스 6단계의 공통 셸 (Figma 148:7242 · 148:7729 · 173:5511 ·
@@ -30,6 +31,19 @@ const currentStep = computed(() => (patient.value ? stepIndexOf(patient.value) :
 /* 판정은 mocks/process.js 한 곳에 있다. 환자 상세의 큰 스테퍼와 같은 규칙이다 */
 function stepState(index) {
   return stepStateOf(patient.value, index)
+}
+
+/*
+ * 단계를 마치고 다음으로 넘어간다. 환자의 현재 단계·다음 단계가 함께 바뀐다 —
+ * 스테퍼도 우측 패널도 같은 레코드를 보므로 여기 한 번만 고치면 된다.
+ * 다음 단계 이름은 `PROCESS_STEPS`가 정한다. 화면이 따로 적으면 갈라진다.
+ */
+function advance() {
+  const next = step.value + 1
+  patient.value.status = STATUS_OF_STEP[next] ?? patient.value.status
+  patient.value.nextStep = STATUS_OF_STEP[next + 1] ?? null
+  /* 프로세스를 '완료'로 바꾸는 것은 마지막 단계의 종결 조작이다. 여기서 하지 않는다 */
+  router.push({ path: `/process/${patient.value.id}/${next}` })
 }
 
 const blocked = ref(null)
@@ -139,6 +153,13 @@ const blockedStyle = computed(() => {
         v-if="step === 0"
         :patient="patient"
         @assign="router.push({ path: `/process/${patient.id}/1` })"
+      />
+      <!-- 사전(1)과 사후(4)는 같은 화면이다. 시점만 단계 번호가 정한다 -->
+      <EmotionReviewStep
+        v-else-if="step === 1 || step === 4"
+        :patient="patient"
+        :step="step"
+        @advance="advance"
       />
       <div v-else class="flex min-h-0 flex-1 items-center justify-center">
         <p class="text-body text-text-disabled">
