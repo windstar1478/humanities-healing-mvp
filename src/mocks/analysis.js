@@ -56,7 +56,36 @@ export const dimensions = [
     value: (patient) => patient.sex,
     chipLabel: (values) => values.map((v) => (v === '남' ? '남성' : '여성')).join('·'),
   },
+  /*
+   * 현재 단계. **분석 화면의 차트에는 올리지 않는다**(chart: false) —
+   * 차트 축을 하나 더 두면 '강조된 구간의 합이 KPI와 같다'는 관계를 읽을 자리가
+   * 늘어나 화면이 무거워지고, 프로세스 상태(진행 중/완료…)와 뜻이 겹쳐 보인다.
+   *
+   * 다만 명단을 거를 때는 이 축이 제일 실용적이다 — '지금 감정평가 단계인 사람'을
+   * 찾는 일이 잦다. 그래서 리스트와 우측 패널에서만 쓴다.
+   * 구간 순서는 `mocks/process.js`의 단계 순서를 따른다(STATUS_OF_STEP).
+   */
+  {
+    id: 'stage',
+    title: '현재 단계',
+    chart: false,
+    keys: [
+      '접수 완료',
+      '프로세스 시작',
+      '감정평가 (사전)',
+      '프로그램 처방',
+      '프로그램 수행',
+      '감정평가 (사후)',
+      '프로세스 종료',
+    ],
+    value: (patient) => patient.status,
+    chipLabel: (values) => values.join('·'),
+    labelWidth: 60,
+  },
 ]
+
+/* 분석 화면의 차트가 쓰는 축. 리스트·패널은 위 전체를 쓴다 */
+export const chartDimensions = dimensions.filter((d) => d.chart !== false)
 
 /* Figma 127:9495의 초기 상태 — 여성 · 40대 이상 · PTSD · 프로세스 진행 중 */
 export const initialFilters = {

@@ -294,6 +294,19 @@ export function draftOf(patientId, phase, code) {
   return responses[key]
 }
 
+/*
+ * 임시 저장. 응답은 이미 반응형 상태에 남아 있지만, **저장했다는 사실이
+ * 남아야** 감정평가 목록에서 '작성 중'과 '아직 손대지 않음'을 구분할 수 있다.
+ * 오토세이브가 없다는 규칙(3.6절)을 화면에서도 지키는 자리다.
+ */
+export function saveSurveyDraft(patientId, phase, code) {
+  const draft = draftOf(patientId, phase, code)
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  draft.savedAt = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return draft
+}
+
 export function scoreOf(survey, answers) {
   return survey.questions.reduce((sum, _, i) => sum + (answers[i] ?? 0), 0)
 }

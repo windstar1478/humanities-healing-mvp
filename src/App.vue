@@ -90,6 +90,7 @@ const PATIENT_SORTS = [
   { key: 'name', label: '가나다순' },
   { key: 'recent', label: '최근 진료순' },
   { key: 'condition', label: '진단순' },
+  { key: 'stage', label: '단계순' },
 ]
 const patientSort = ref('name')
 
@@ -98,6 +99,12 @@ const patientSort = ref('name')
  * 여기에 순서를 다시 적으면 차트의 막대 순서와 패널의 정렬이 갈라진다.
  */
 const CONDITION_ORDER = dimensions.find((d) => d.id === 'condition').keys
+
+/*
+ * 단계 순서도 같은 곳에서 온다. 프로세스의 진행 순서 그대로라
+ * 위에서 아래로 읽으면 명단이 프로세스를 따라 늘어선다.
+ */
+const STAGE_ORDER = dimensions.find((d) => d.id === 'stage').keys
 const sortOpen = ref(false)
 /* 팝오버는 패널 밖으로 나가야 한다 — aside가 overflow-y-auto라 안에 두면 잘린다 */
 const sortAnchor = ref(null)
@@ -111,6 +118,10 @@ const sortedPatients = computed(() => {
   if (patientSort.value === 'condition') {
     return list.sort((a, b) =>
       CONDITION_ORDER.indexOf(a.condition) - CONDITION_ORDER.indexOf(b.condition) || byName(a, b))
+  }
+  if (patientSort.value === 'stage') {
+    return list.sort((a, b) =>
+      STAGE_ORDER.indexOf(a.status) - STAGE_ORDER.indexOf(b.status) || byName(a, b))
   }
   /* 진료가 없는 사람은 뒤로 보낸다 — 최근이라 할 것이 없다. 리스트 화면과 같은 규칙 */
   return list
@@ -135,9 +146,16 @@ const sortedPatients = computed(() => {
 const patientQuery = ref('')
 const searching = computed(() => patientQuery.value.trim().length > 0)
 
+/*
+ * 검색은 이름·진단에 더해 **현재 단계**도 본다. '감정평가'를 치면 그 단계에
+ * 있는 사람만 남는다 — 패널에는 필터를 둘 자리가 없어(폭 274) 검색이 그 일을 겸한다.
+ * 전체 환자 리스트에는 같은 축이 필터로 올라가 있다(mocks/analysis.js의 stage).
+ */
 const searchResults = computed(() => {
   const q = patientQuery.value.trim()
-  return sortedPatients.value.filter((p) => p.name.includes(q) || p.condition.includes(q))
+  return sortedPatients.value.filter(
+    (p) => p.name.includes(q) || p.condition.includes(q) || p.status.includes(q),
+  )
 })
 
 /* 한 벌의 행 마크업이 세 구간을 다 그린다. 구간마다 복제하면 한쪽만 고쳐진다 */

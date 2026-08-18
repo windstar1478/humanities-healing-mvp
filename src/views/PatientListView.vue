@@ -328,8 +328,18 @@ function reset() {
       v-if="openPanel === 'filter'"
       class="absolute right-[165px] top-[68px] z-40 flex max-h-[420px] w-[220px] flex-col overflow-y-auto rounded-lg border border-border-default bg-surface-card"
     >
-      <div v-for="dimension in dimensions" :key="dimension.id">
-        <p class="px-3 pb-1 pt-3 text-count text-text-secondary">{{ dimension.title }}</p>
+      <!--
+        축과 축 사이는 구분선과 표면 차이로 나눈다. 라벨만 두면 어디까지가
+        같은 축인지 읽히지 않아 '프로세스 상태'와 '진단 유형'이 한 덩어리로 보인다.
+        머리는 필드 표면(surface-field)이라 항목 행(카드 표면)과 갈린다.
+      -->
+      <div v-for="(dimension, di) in dimensions" :key="dimension.id">
+        <p
+          class="bg-surface-field px-3 py-1.5 text-count font-medium text-text-secondary"
+          :class="di > 0 ? 'border-y border-border-default' : 'border-b border-border-default'"
+        >
+          {{ dimension.title }}
+        </p>
         <button
           v-for="key in dimension.keys"
           :key="key"

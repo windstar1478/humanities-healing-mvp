@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { Printer, PencilLine, Check, ArrowRight } from 'lucide-vue-next'
 import { processFor } from '../mocks/processLibrary.js'
 import { PROCESS_STEPS } from '../mocks/process.js'
-import { surveys, responseOf } from '../mocks/surveys.js'
+import { surveys, responseOf, answeredCount } from '../mocks/surveys.js'
 import InlineCallout from './InlineCallout.vue'
 
 /*
@@ -50,7 +50,15 @@ const items = computed(() => {
   return (source?.items ?? []).map((item) => {
     const survey = surveys[item.code]
     const response = responseOf(props.patient.id, phase.value, item.code)
-    return { survey, done: !!response?.done, score: response?.score ?? null }
+    const answered = response ? answeredCount(survey, response.answers) : 0
+    /* 손을 댔지만 끝내지 않은 것은 '작성 중'이다 — 미착수와 구분해야 이어서 열 수 있다 */
+    return {
+      survey,
+      done: !!response?.done,
+      score: response?.score ?? null,
+      partial: !response?.done && answered > 0,
+      answered,
+    }
   })
 })
 
@@ -162,7 +170,7 @@ const percent = (value, max) => `${Math.min(100, Math.max(0, (value / max) * 100
           class="flex shrink-0 items-start gap-1 rounded-lg border border-border-default p-2"
         >
           <!-- 작성 전에는 내용을 흐리게 내린다. 아직 값이 없다는 뜻이다 -->
-          <div class="flex min-w-0 flex-1 flex-col gap-2" :class="row.done ? '' : 'opacity-50'">
+          <div class="flex min-w-0 flex-1 flex-col gap-2" :class="row.done || row.partial ? '' : 'opacity-50'">
             <div class="flex items-start gap-2">
               <p class="shrink-0 text-body">{{ row.survey.name }}</p>
               <span class="flex shrink-0 items-center gap-0.5">
@@ -218,7 +226,12 @@ const percent = (value, max) => `${Math.min(100, Math.max(0, (value / max) * 100
                 : 'border-border-default active:bg-surface-pressed'"
             >
               <component :is="row.done ? Check : PencilLine" :size="16" class="shrink-0" />
-              {{ row.done ? '작성완료' : '작성하기' }}
+              <template v-if="row.done">작성완료</template>
+              <template v-else-if="row.partial">
+                이어서 작성
+                <span class="text-caption text-text-secondary">{{ row.answered }}/{{ row.survey.questions.length }}</span>
+              </template>
+              <template v-else>작성하기</template>
             </span>
           </button>
         </div>

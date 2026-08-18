@@ -3,7 +3,7 @@ import { reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { X, RotateCcw, Mars, Venus, ChevronRight } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
-import { dimensions, initialFilters } from '../mocks/analysis.js'
+import { chartDimensions as dimensions, initialFilters } from '../mocks/analysis.js'
 
 /*
  * 환자 분석 (Figma 127:9495).

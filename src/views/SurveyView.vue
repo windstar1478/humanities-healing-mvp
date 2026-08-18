@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { Check, CircleCheckBig } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
-import { surveyOf, draftOf, answeredCount, submitSurvey } from '../mocks/surveys.js'
+import { surveyOf, draftOf, answeredCount, submitSurvey, saveSurveyDraft } from '../mocks/surveys.js'
 
 /*
  * 설문 수행 (Figma 없음 — 임의 제작).
@@ -49,15 +49,14 @@ function submit() {
 }
 
 /*
- * 임시 저장은 응답을 그대로 두고 화면만 닫는 것이 아니다 — 응답은 이미
- * 반응형 상태에 남아 있고, 이 버튼은 **지금까지가 저장됐다는 사실을 알리는**
- * 명시적 조작이다. 오토세이브가 없다는 규칙을 화면에서도 지킨다.
+ * 임시 저장. 응답은 이미 반응형 상태에 남아 있고, 이 버튼은 **저장했다는 사실을
+ * 남기는** 명시적 조작이다. 그 사실이 남아야 감정평가 목록이 '작성 중'을 알아보고,
+ * 나가기 경고도 무엇이 사라지는지를 다르게 말할 수 있다.
  */
-const savedAt = ref(null)
+const savedAt = computed(() => draft.value.savedAt ?? null)
+
 function saveDraft() {
-  const d = new Date()
-  const pad = (n) => String(n).padStart(2, '0')
-  savedAt.value = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  saveSurveyDraft(route.params.patientId, phase.value, route.params.code)
 }
 
 /*
@@ -70,14 +69,32 @@ function saveDraft() {
  */
 const warning = ref(false)
 
+/* 경고에서 '나가기'를 고른 뒤에는 가드가 붙잡지 않는다 */
+const leaving = ref(false)
+
 onBeforeRouteLeave((to, from) => {
-  /* 제출을 마쳤으면 붙잡을 것이 없다 */
-  if (submitted.value) return true
+  /* 제출을 마쳤거나 나가기를 명시적으로 골랐으면 붙잡을 것이 없다 */
+  if (submitted.value || leaving.value) return true
   /* 모달이 쿼리를 붙이며 일으키는 이동까지 막으면 경고 자신이 열리지 못한다 */
   if (to.path === from.path) return true
   warning.value = true
   return false
 })
+
+/*
+ * **나가는 길은 여기 하나뿐이다.** 화면에 상시 나가기 버튼을 두면 환자가
+ * 무심코 누른다. 뒤로가기 제스처를 받아 3버튼 경고로 갈라 놓으면, 나가려면
+ * 두 번의 명시적 조작을 거쳐야 한다 — 개인 메모의 미저장 이탈 경고와 같은 문법이다.
+ *
+ * 다 채우지 않으면 제출할 수 없으므로, 저장하고 나가는 길이 없으면 중간에
+ * 멈춘 설문은 아무 데도 갈 수 없다.
+ */
+function leave(save) {
+  if (save) saveDraft()
+  leaving.value = true
+  warning.value = false
+  backToCounselor()
+}
 
 /* 상담사용으로 돌아간다. 완료 알림 화면의 명시적 조작으로만 부른다 */
 function backToCounselor() {
@@ -219,24 +236,61 @@ function backToCounselor() {
         class="fixed inset-0 z-50 flex items-center justify-center p-6"
         :style="{ backgroundColor: 'var(--scrim)' }"
       >
-        <div class="flex w-[402px] flex-col gap-3 rounded-lg border border-border-default bg-surface-card px-3 py-2">
+        <div class="flex w-[402px] flex-col gap-4 rounded-lg border border-border-default bg-surface-card px-3 py-2">
           <div class="flex flex-col gap-2 p-1">
             <p class="text-title-sm font-semibold">
               {{ warning === 'incomplete' ? '아직 응답하지 않은 문항이 있습니다' : '설문을 중단하시겠습니까?' }}
             </p>
             <p class="text-caption text-text-secondary">
-              {{ warning === 'incomplete'
-                ? `${total - answered}문항이 남았습니다. 모든 문항에 응답해야 제출할 수 있습니다.`
-                : '지금까지 응답한 내용은 임시 저장되지 않으면 사라집니다.' }}
+              <template v-if="warning === 'incomplete'">
+                {{ total - answered }}문항이 남았습니다. 모든 문항에 응답해야 제출할 수 있습니다.
+              </template>
+              <template v-else-if="savedAt">
+                {{ savedAt }}까지 저장되어 있습니다. 그 뒤에 답한 내용은 저장하지 않으면 사라집니다.
+              </template>
+              <template v-else>
+                지금까지 응답한 내용은 저장하지 않으면 사라집니다.
+              </template>
             </p>
           </div>
-          <div class="flex items-center justify-end gap-2.5">
+
+          <!-- 미완 제출 안내는 갈림길이 아니라 알림이라 버튼 하나다 -->
+          <div v-if="warning === 'incomplete'" class="flex items-center justify-end">
             <button
               class="flex h-9 items-center justify-center rounded-lg bg-surface-inverse px-3 py-2 text-body text-text-inverse active:bg-surface-inverse-pressed"
               @click="warning = false"
             >
               계속 응답
             </button>
+          </div>
+
+          <!--
+            나가는 갈림길은 셋이다. 파괴적인 쪽(저장하지 않고 나가기)을 왼쪽에
+            텍스트만으로 떨어뜨리고, 기본 자리(오른쪽 끝)는 '계속 응답'이 갖는다 —
+            실수로 나가는 것을 막는 것이 이 경고의 목적이다.
+            개인 메모의 미저장 이탈 경고와 같은 배치다(4.0.4절).
+          -->
+          <div v-else class="flex items-center justify-between px-1">
+            <button
+              class="flex h-11 items-center justify-center text-label font-medium text-text-secondary active:text-text-primary"
+              @click="leave(false)"
+            >
+              저장하지 않고 나가기
+            </button>
+            <div class="flex items-center gap-2.5">
+              <button
+                class="flex h-9 items-center justify-center rounded-lg border border-border-default px-3 py-2 text-body opacity-80 active:bg-surface-pressed"
+                @click="leave(true)"
+              >
+                임시 저장하고 나가기
+              </button>
+              <button
+                class="flex h-9 items-center justify-center rounded-lg bg-surface-inverse px-3 py-2 text-body text-text-inverse active:bg-surface-inverse-pressed"
+                @click="warning = false"
+              >
+                계속 응답
+              </button>
+            </div>
           </div>
         </div>
       </div>
