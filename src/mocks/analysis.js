@@ -39,8 +39,11 @@ export const dimensions = [
     value: (patient) => patient.condition,
     chipLabel: (values) => values.join('·'),
     labelWidth: 60,
-    /* 동반이환이 무엇을 겹친 것인지 밝힌다 */
-    note: '게임과몰입·PTSD',
+    /*
+     * 동반이환이 무엇을 겹친 것인지 밝힌다.
+     * 무엇에 대한 설명인지 앞에 적는다 — 값만 두면 차트의 네 번째 구간으로 읽힌다
+     */
+    note: '동반이환 = 게임과몰입 · PTSD',
   },
   {
     id: 'age',

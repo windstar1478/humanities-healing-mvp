@@ -174,7 +174,7 @@ const blockedStyle = computed(() => {
             <div
               v-for="bar in [
                 { key: 'pre', label: '사전', value: row.pre, tone: 'bg-chart-bar-default' },
-                { key: 'post', label: '사후', value: row.post, tone: 'bg-chart-axis-label' },
+                { key: 'post', label: '사후', value: row.post, tone: 'bg-chart-bar-strong' },
               ]"
               :key="bar.key"
               class="flex items-center gap-2.5"

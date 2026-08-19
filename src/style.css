@@ -150,6 +150,8 @@
   --color-chart-bar-default:  var(--color-neutral-300);
   --color-chart-bar-selected: var(--color-brand-500);
   --color-chart-bar-track:    var(--color-neutral-100);
+  /* 두 막대를 한 트랙에 겹쳐 읽히려면 진한 쪽이 따로 필요하다 (프로세스 종료의 사후) */
+  --color-chart-bar-strong:   var(--color-text-secondary);
   --color-chart-axis-label:   var(--color-text-secondary);
   --color-chart-value-label:  var(--color-text-primary);
   --color-chart-gridline:     var(--color-neutral-100);
@@ -215,6 +217,7 @@
   --color-chart-bar-default:  var(--color-neutral-700);
   --color-chart-bar-selected: var(--color-brand-400);
   --color-chart-bar-track:    var(--color-neutral-800);
+  --color-chart-bar-strong:   var(--color-text-secondary);
   --color-chart-gridline:     var(--color-neutral-800);
 
   --color-indicator-notify:  var(--color-red-400);
@@ -229,4 +232,12 @@
 body {
   background-color: var(--color-surface-canvas);
   color: var(--color-text-primary);
+
+  /*
+   * 한국어는 어절 단위로 끊는다. 기본값으로 두면 '사라집니 / 다.'처럼 낱말
+   * 한가운데가 갈라져 마지막 줄에 한 글자만 남는다.
+   * 끊을 자리가 없는 긴 문자열만 예외로 강제 줄바꿈한다.
+   */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }

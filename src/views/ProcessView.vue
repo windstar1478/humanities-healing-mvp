@@ -5,6 +5,7 @@ import { ChevronLeft, Check, Play, User } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import { PROCESS_STEPS, STATUS_OF_STEP, stepIndexOf, stepStateOf, completeProcess } from '../mocks/process.js'
 import InlineCallout from '../components/InlineCallout.vue'
+import { josa } from '../text.js'
 import ProcessStartStep from '../components/ProcessStartStep.vue'
 import EmotionReviewStep from '../components/EmotionReviewStep.vue'
 import ProgramPrescribeStep from '../components/ProgramPrescribeStep.vue'
@@ -73,7 +74,7 @@ function goStep(i, event) {
     const r = event.currentTarget.getBoundingClientRect()
     blocked.value = {
       title: '아직 진행할 수 없는 단계입니다',
-      detail: `${PROCESS_STEPS[currentStep.value]}을(를) 마치면 열립니다`,
+      detail: `${josa(PROCESS_STEPS[currentStep.value], '을', '를')} 마치면 열립니다`,
       x: r.left + r.width / 2,
       y: r.bottom,
     }

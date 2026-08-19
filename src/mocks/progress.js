@@ -29,8 +29,12 @@ function surveyProgress(patient, phase) {
   return { done, total: items.length }
 }
 
-/* 프로그램 수행 단계의 회차 진행. 처방된 프로그램이 회차 수를 정한다 */
-function sessionProgress(patient) {
+/*
+ * 프로그램 수행 단계의 회차 진행. 처방된 프로그램이 회차 수를 정한다.
+ * 환자 상세와 코어 프로세스 3단계가 **같은 값을 말해야 한다** — 상세가 Figma
+ * 고정값(8회차 중 5회차)을 쓰고 있어 두 화면이 다른 회차를 말했다.
+ */
+export function sessionProgress(patient) {
   const program = findProgram(patient.programId)
   if (!program) return null
   const progress = progressOf(patient, program)

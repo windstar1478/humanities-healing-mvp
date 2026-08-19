@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+import { session } from '../authState.js'
 import { Check, CircleCheckBig } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import { surveyOf, draftOf, answeredCount, submitSurvey, saveSurveyDraft } from '../mocks/surveys.js'
@@ -96,8 +97,19 @@ function leave(save) {
   backToCounselor()
 }
 
-/* 상담사용으로 돌아간다. 완료 알림 화면의 명시적 조작으로만 부른다 */
+/*
+ * 돌아갈 곳은 **누가 들고 있느냐**가 정한다.
+ * 상담사가 건네준 경우(상담사 세션)는 감정평가 단계로 돌아가고,
+ * 환자가 자기 화면에서 연 경우는 자기 화면으로 돌아간다 —
+ * 환자 세션으로 상담사 화면에 보내면 가드가 되돌려 화면이 한 번 튄다.
+ */
+const patientSession = () => session.role === 'patient'
+
 function backToCounselor() {
+  if (patientSession()) {
+    router.replace({ path: '/patient' })
+    return
+  }
   router.replace({ path: `/process/${route.params.patientId}/${phase.value === 'post' ? 4 : 1}` })
 }
 </script>
@@ -114,7 +126,7 @@ function backToCounselor() {
       <!-- 환자가 무심코 누를 자리는 피한다. 화면 아래에 따로 떨어뜨렸다 -->
       <button class="mt-12 flex h-11 items-center" @click="backToCounselor">
         <span class="flex h-9 items-center rounded-lg border border-border-default bg-surface-card px-3 text-label font-medium text-text-secondary active:bg-surface-pressed">
-          상담사 화면으로 돌아가기
+          {{ session.role === 'patient' ? '내 화면으로 돌아가기' : '상담사 화면으로 돌아가기' }}
         </span>
       </button>
     </div>

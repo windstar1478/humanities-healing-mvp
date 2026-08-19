@@ -6,6 +6,7 @@ import { processFor } from '../mocks/processLibrary.js'
 import { PROCESS_STEPS, stepIndexOf, completionOf } from '../mocks/process.js'
 import { surveys, responseOf, answeredCount } from '../mocks/surveys.js'
 import InlineCallout from './InlineCallout.vue'
+import { josa } from '../text.js'
 
 /*
  * 코어 프로세스 1·4단계 '감정평가' (Figma 148:7935).
@@ -146,10 +147,7 @@ const completion = computed(() => completionOf(props.patient))
 const nextLabel = computed(() => {
   if (ended.value) return '프로세스 종료 보기'
   if (isFinal.value) return '종료 확정'
-  const name = PROCESS_STEPS[props.step + 1] ?? ''
-  const last = name.charCodeAt(name.length - 1)
-  const hasFinal = last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0
-  return `${name}${hasFinal ? '으로' : '로'} 이동`
+  return `${josa(PROCESS_STEPS[props.step + 1] ?? '', '으로', '로')} 이동`
 })
 
 /* 확인 문구의 '현재 시각'. 종료 시각이 아니라 지금 언제인지를 알려주는 값이다 */

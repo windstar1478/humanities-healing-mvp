@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { session } from './authState.js'
 
 /*
  * 우측 환자 패널은 '환자를 다루는 화면'에만 붙는다.
@@ -9,9 +10,24 @@ import { createRouter, createWebHistory } from 'vue-router'
  *
  * meta.noPatientPanel이 셸에서 패널을 걷고 중앙 패딩도 36 → 24로 바꾼다.
  */
-export default createRouter({
+const router = createRouter({
   history: createWebHistory(),
   routes: [
+    /*
+     * 첫 화면. 셸을 걷는다 — 아직 누구인지 정해지지 않아 좌측 네비를 그릴 수
+     * 없고, 로그인 전에 우측 패널의 환자 명단이 보이면 안 된다.
+     */
+    {
+      path: '/login',
+      component: () => import('./views/LoginView.vue'),
+      meta: { bare: true, public: true },
+    },
+    /* 환자로 로그인했을 때. 환자용 화면은 이번 범위 밖이라 안내와 나가는 길만 있다 */
+    {
+      path: '/patient',
+      component: () => import('./views/PatientHomeView.vue'),
+      meta: { bare: true, role: 'patient' },
+    },
     { path: '/',         component: () => import('./views/HomeView.vue') },
     { path: '/schedule', component: () => import('./views/ScheduleView.vue') },
     { path: '/patients', component: () => import('./views/PatientsView.vue') },
@@ -58,3 +74,23 @@ export default createRouter({
     },
   ],
 })
+
+/*
+ * 로그인 가드. 세션이 없으면 어느 화면도 열지 않는다 —
+ * 화면마다 검사하면 한 곳만 빠져도 우회로가 된다.
+ *
+ * 역할도 함께 본다. 환자 세션으로 상담사 화면이 열리면 다른 환자의 명단이
+ * 보인다 — 이 앱에서 제일 큰 손실이다(1.2절).
+ */
+router.beforeEach((to) => {
+  if (to.meta.public) return true
+  if (!session.role) return { path: '/login', replace: true }
+  if (session.role === 'patient' && to.meta.role !== 'patient') {
+    /* 설문 수행만 예외다. 상담사가 건네준 화면이라 환자가 조작하는 것이 맞다 */
+    if (!to.path.startsWith('/survey/')) return { path: '/patient', replace: true }
+  }
+  if (session.role === 'counselor' && to.meta.role === 'patient') return { path: '/', replace: true }
+  return true
+})
+
+export default router

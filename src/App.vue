@@ -13,7 +13,11 @@ import {
   dragState, startPress, trackPress, trackDrag, endPress, cancelDrag, clearRejected,
   swallowDragClick, beginGesture,
 } from './dragState.js'
+import { unreadCount } from './mocks/notifications.js'
+import { COUNSELOR } from './authState.js'
 import InlineCallout from './components/InlineCallout.vue'
+import NotificationPopover from './components/NotificationPopover.vue'
+import SettingsModal from './components/SettingsModal.vue'
 
 /*
  * 좌측 하단 프로필 사진.
@@ -22,12 +26,31 @@ import InlineCallout from './components/InlineCallout.vue'
  * 정적 import와 달리 파일이 없어도 빌드가 깨지지 않기 때문이다 — 목업 자산이라
  * 저장소에 항상 들어 있다고 보장할 수 없다.
  * `src/assets/profile.*`에 넣으면 그대로 붙는다(png · jpg · svg · webp).
+ *
+ * **정사각으로 잘라 둔 것을 쓴다.** 원본 로고는 심볼 아래에 워드마크가 붙은
+ * 가로형이라 36px 원에 통째로 넣으면 글자가 뭉개지고 위아래에 빈 띠가 남는다.
+ * 심볼만 남긴 정사각(`profile.png`)을 `object-cover`로 원에 꽉 채운다.
+ * 원본은 `hospital-logo-full.png`로 남겨 뒀다(글로브가 잡지 않는 이름이다).
  */
 const profilePhoto = Object.values(
   import.meta.glob('./assets/profile.*', { eager: true, query: '?url', import: 'default' }),
 )[0] ?? null
 
-const COUNSELOR = { name: '강치유', hospital: '중앙대학교 병원' }
+/*
+ * 알림과 설정. **Figma 디자인이 없어 임의로 만든 것이다.**
+ *
+ * 알림은 읽고 지나가는 가벼운 콘텐츠라 팝오버, 설정은 값을 바꾸고 저장하는
+ * 자리라 모달이다(3.5절). 팝오버는 버튼의 자리를 받아 그 오른쪽에 붙는다 —
+ * 좌측 네비가 화면 왼쪽 끝이라 아래로 펼치면 화면 밖으로 나간다.
+ */
+const notifyAnchor = ref(null)
+const settingsOpen = ref(false)
+
+function toggleNotify(event) {
+  notifyAnchor.value = notifyAnchor.value ? null : event.currentTarget.getBoundingClientRect()
+}
+
+const unread = computed(() => unreadCount())
 
 /*
  * 거부 콜아웃은 손을 뗀 자리 옆에 뜬다. 그 자리가 방금 조작한 곳이라
@@ -255,7 +278,7 @@ onUnmounted(() => {
           v-if="profilePhoto"
           :src="profilePhoto"
           alt=""
-          class="size-full object-contain"
+          class="size-full object-cover"
         />
         <span v-else class="text-label font-medium text-text-secondary">
           {{ COUNSELOR.name.slice(0, 1) }}
@@ -267,12 +290,26 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- 알림 / 설정 -->
-    <button class="flex h-11 items-center gap-3 whitespace-nowrap rounded-lg px-1 text-text-secondary">
+    <!-- 알림 / 설정. 열려 있는 동안 선택 상태로 둔다 -->
+    <button
+      class="flex h-11 w-full items-center gap-3 whitespace-nowrap rounded-lg px-1"
+      :class="notifyAnchor ? 'bg-selected-bg text-text-primary active:bg-selected-bg-pressed' : 'text-text-secondary active:bg-surface-pressed'"
+      @click="toggleNotify"
+    >
       <Bell :size="16" class="shrink-0" />
       <span>알림</span>
+      <!-- 읽지 않은 수. accent가 아니라 중립 채움이다(3.1절) -->
+      <span
+        v-if="unread"
+        class="flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-inverse px-1 text-count text-text-inverse"
+      >
+        {{ unread }}
+      </span>
     </button>
-    <button class="flex h-11 items-center gap-3 whitespace-nowrap rounded-lg px-1 text-text-secondary">
+    <button
+      class="flex h-11 w-full items-center gap-3 whitespace-nowrap rounded-lg px-1 text-text-secondary active:bg-surface-pressed"
+      @click="settingsOpen = true"
+    >
       <Settings :size="16" class="shrink-0" />
       <span>설정</span>
     </button>
@@ -471,5 +508,14 @@ onUnmounted(() => {
         </div>
       </div>
     </Teleport>
+
+    <!-- 알림 팝오버 · 설정 모달. 둘 다 셸이 관리한다 -->
+    <NotificationPopover
+      v-if="notifyAnchor"
+      :anchor="notifyAnchor"
+      @close="notifyAnchor = null"
+      @go="(to) => { notifyAnchor = null; router.push(to) }"
+    />
+    <SettingsModal v-if="settingsOpen" @close="settingsOpen = false" />
   </div>
 </template>

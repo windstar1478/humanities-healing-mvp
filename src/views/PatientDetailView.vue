@@ -7,7 +7,7 @@ import {
 } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import {
-  PROCESS_STEPS, stepIndexOf, stepStateOf, SESSION_TOTAL, SESSION_CURRENT,
+  PROCESS_STEPS, stepIndexOf, stepStateOf,
   processHistory, historyOf, CURRENT_VERSION,
   keyMetricsOf, metricPoints, SCALE_SPAN, SCALE_STEPS,
 } from '../mocks/process.js'
@@ -15,6 +15,8 @@ import { notesOf, addNote, updateNote, removeNote } from '../mocks/notes.js'
 import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
 import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
 import InlineCallout from '../components/InlineCallout.vue'
+import { josa } from '../text.js'
+import { progressOfPatient, sessionProgress } from '../mocks/progress.js'
 
 /*
  * 환자 상세 (Figma 130:3152 · 148:5384).
@@ -82,7 +84,7 @@ function openStep(i, event) {
     const r = event.currentTarget.getBoundingClientRect()
     stepBlocked.value = {
       title: '아직 진행할 수 없는 단계입니다',
-      detail: `${PROCESS_STEPS[currentStep.value]}을(를) 마치면 열립니다`,
+      detail: `${josa(PROCESS_STEPS[currentStep.value], '을', '를')} 마치면 열립니다`,
       x: r.left + r.width / 2,
       y: r.bottom,
     }
@@ -124,11 +126,15 @@ const openHistory = ref(processHistory.find((h) => h.state === '진행 중')?.id
  * 지표는 환자별로 만든다(mocks/process.js의 임의 규칙).
  * 점의 개수는 지나온 회차 수를 따른다 — 사전 한 점에 완료한 회차만큼 더한다.
  */
+/* 회차는 수행 기록에서 온다. 화면이 따로 세면 코어 프로세스와 갈라진다 */
+const sessions = computed(() => (patient.value ? sessionProgress(patient.value) : null))
+const progress = computed(() => (patient.value ? progressOfPatient(patient.value) : null))
+
 const metricPointCount = computed(() => {
   const step = currentStep.value
   if (step < 3) return 1
   if (step > 3) return metricPoints.length
-  return Math.min(metricPoints.length, 1 + SESSION_CURRENT)
+  return Math.min(metricPoints.length, 1 + (sessions.value?.done ?? 0))
 })
 
 const keyMetrics = computed(() => keyMetricsOf(patient.value, metricPointCount.value))
@@ -220,7 +226,9 @@ const editingSubject = computed(() => {
  */
 const currentContext = computed(() => {
   const step = PROCESS_STEPS[currentStep.value]
-  if (isRunning.value && step === '프로그램 수행') return `${step} · ${SESSION_CURRENT}회차`
+  if (isRunning.value && step === '프로그램 수행' && sessions.value) {
+    return `${step} · ${Math.min(sessions.value.done + 1, sessions.value.total)}회차`
+  }
   return patient.value?.status ?? step
 })
 
@@ -458,8 +466,8 @@ onBeforeRouteLeave((to, from) => {
           </span>
           <span class="text-label font-medium text-text-primary">
             {{ PROCESS_STEPS[currentStep] }}
-            <template v-if="isRunning && PROCESS_STEPS[currentStep] === '프로그램 수행'">
-              — {{ SESSION_TOTAL }}회차 중 {{ SESSION_CURRENT }}회차 진행 중
+            <template v-if="isRunning && progress?.detail">
+              — {{ progress.detail }}
             </template>
             <template v-else-if="!isRunning"> — {{ patient.process }}</template>
           </span>

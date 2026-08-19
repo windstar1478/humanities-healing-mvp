@@ -67,10 +67,6 @@ export function stepStateOf(patient, index) {
   return index === current ? 'current' : 'waiting'
 }
 
-/* 프로그램 수행 회차. Figma 값(8회차 중 5회차) */
-export const SESSION_TOTAL = 8
-export const SESSION_CURRENT = 5
-
 /*
  * 프로세스 이력. 최신이 마지막이다.
  * 이름은 진단에 따라 달라지므로 버전만 두고 화면이 앞을 붙인다
