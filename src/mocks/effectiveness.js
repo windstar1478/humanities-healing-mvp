@@ -8,10 +8,14 @@
  *    PTSD 쪽과 상관표의 나머지 세 블록은 **같은 골격으로 생성한 임의값**이다.
  *    실제 분석 결과가 오면 이 파일만 갈아끼운다.
  *
- * ⚠️ 여기 쓰는 척도 구성(PHQ-9 · BIS-11 · K-CAARS …)은 앱의 감정평가 설문
- *    목록(`surveys.js`)과 다르다. 웹 화면의 구성을 그대로 옮긴 것이라,
- *    어느 쪽이 맞는지 확인이 필요하다.
+ * **척도 구성은 앱의 감정평가 설문에서 온다.** 웹 화면은 PHQ-9 · BIS-11 ·
+ * K-CAARS를 쓰지만, 그러면 같은 진단의 환자를 두 화면이 다른 척도로 말한다.
+ * 이름과 총점도 `surveys.js`에서 읽는다 — 여기 다시 적으면 갈라진다.
+ * 인문 척도는 그 코드에 `H-`를 붙인 것이고, 기존 임상 척도는 접두 없는 원본이다.
  */
+
+import { surveys } from './surveys.js'
+import { SURVEY_CODES } from './processLibrary.js'
 
 /* 씨앗. 목업 곳곳과 같은 FNV-1a다 — 새로고침해도 값이 달라지면 안 된다 */
 function hash(text) {
@@ -60,112 +64,106 @@ function blockOf(condition, block) {
   )
 }
 
-const S = (code, name, p, pre, post, max) => ({ code, name, p, pre, post, max })
-
-const GAME = {
-  scales: [
-    S('H-PHQ-9', '우울증 자가 검사', 0.023, 42, 28, 50),
-    S('H-GAD-7', '범불안장애척도', 0.013, 62, 46, 70),
-    S('H-BIS-11', 'Barratt 충동성 척도', 0.036, 41, 23, 50),
-    S('H-K-CAARS', '한국판 성인 ADHD 척도', 0.041, 55, 38, 60),
-    S('H-IGDS9-SF', '인터넷 게임장애 척도', 0.008, 34, 19, 40),
-    S('H-YIAS', '인터넷 중독 척도', 0.019, 68, 45, 80),
-  ],
-  /* 방향: up이면 값이 커지는 것이 좋아지는 것이다 */
-  hrv: [
-    { label: 'SDNN (ms)', pre: 42.3, post: 58.7, better: 'up' },
-    { label: 'LF/HF Ratio', pre: 2.41, post: 1.82, better: 'down' },
-  ],
-  fnirs: { label: 'DLPFC', pre: 0.34, post: 0.61 },
-  note: '충동 조절 억제 신경망인 DLPFC 활성화가 유의하게 증가하여, 인문 치유 프로그램이 게임과몰입 환자의 전전두엽 기능 회복과 임상적 완화 효과에 기여함을 시사합니다.',
-  pearson: {
-    rows: ['K-CAARS', 'BIS-11', 'GAD-7', 'PHQ-9', 'YIAS', 'IGDS9-SF'],
-    cols: ['H-IGDS9-SF', 'H-YIAS', 'H-PHQ-9', 'H-GAD-7', 'H-BIS-11', 'H-K-CAARS'],
-    values: [
-      [0.62, 0.66, 0.63, 0.70, 0.82, 0.89],
-      [0.62, 0.83, 0.59, 0.69, 0.90, 0.58],
-      [0.75, 0.81, 0.63, 0.97, 0.89, 0.76],
-      [0.69, 0.84, 0.96, 0.56, 0.66, 0.75],
-      [0.58, 0.97, 0.73, 0.78, 0.78, 0.75],
-      [0.90, 0.79, 0.58, 0.70, 0.59, 0.57],
-    ],
-  },
-  similarity: [
-    { pair: 'H-IGDS9-SF ↔ 인터넷 게임장애 척도', value: 95.3 },
-    { pair: 'H-YIAS ↔ 인터넷 중독 척도', value: 91.2 },
-    { pair: 'H-PHQ-9 ↔ 우울증 자가 검사', value: 91.5 },
-    { pair: 'H-GAD-7 ↔ 범불안장애척도', value: 94.7 },
-  ],
-  similarityNote: '인문학 기반 설문 척도가 기존 임상 지표와 높은 유사도를 보여, 증상군별 인문 치유 프로그램 평가에 활용 가능함을 시사합니다.',
-  ttest: {
-    n: 250,
-    rows: [
-      { pair: 'IGDS9-SF ↔ H-IGDS9-SF', diff: 0.62, t: 1.71, p: 0.301 },
-      { pair: 'YIAS ↔ H-YIAS', diff: 0.50, t: 1.49, p: 0.352 },
-      { pair: 'PHQ-9 ↔ H-PHQ-9', diff: 0.57, t: 1.83, p: 0.246 },
-      { pair: 'GAD-7 ↔ H-GAD-7', diff: 0.68, t: 0.99, p: 0.316 },
-      { pair: 'BIS-11 ↔ H-BIS-11', diff: 0.60, t: 1.42, p: 0.419 },
-      { pair: 'K-CAARS ↔ H-K-CAARS', diff: 0.52, t: 1.82, p: 0.279 },
-    ],
-  },
+/*
+ * 사전·사후 점수와 유의값. 연구 표본의 결과라 환자 응답에서 나오지 않는다 —
+ * 척도 코드를 해시해 결정론적으로 만든다(새로고침해도 값이 달라지면 안 된다).
+ * **낮을수록 양호**를 따르므로 사후가 내려간다(4.6.6절).
+ */
+function scalesOf(condition) {
+  return (SURVEY_CODES[condition] ?? []).map((code) => {
+    const survey = surveys[code]
+    const seed = hash(`${condition}:${code}`)
+    const pre = Math.round(survey.max * (0.55 + (seed % 25) / 100))
+    const drop = 0.25 + ((seed >>> 5) % 20) / 100
+    return {
+      code: `H-${code}`,
+      name: survey.name,
+      p: Math.round((0.005 + ((seed >>> 9) % 55) / 1000) * 1000) / 1000,
+      pre,
+      post: Math.max(1, Math.round(pre * (1 - drop))),
+      max: survey.max,
+    }
+  })
 }
 
-/* PTSD 쪽은 같은 골격으로 채운 임의값이다 */
-const PTSD = {
-  scales: [
-    S('H-PCL-5', 'PTSD 증상 체크리스트', 0.011, 58, 37, 80),
-    S('H-CAPS-5', '임상가 면담 평가', 0.029, 31, 19, 40),
-    S('H-GAD-7', '범불안장애척도', 0.018, 16, 9, 21),
-    S('H-BDI-II', '벡 우울 척도', 0.044, 29, 18, 63),
-    S('H-WHOQOL', '삶의 질 척도', 0.033, 44, 66, 100),
-    S('H-RSES', '자아존중감 척도', 0.052, 22, 31, 40),
-  ],
-  hrv: [
-    { label: 'SDNN (ms)', pre: 38.6, post: 51.4, better: 'up' },
-    { label: 'LF/HF Ratio', pre: 2.87, post: 2.05, better: 'down' },
-  ],
-  fnirs: { label: 'mPFC', pre: 0.29, post: 0.52 },
-  note: '위협 반응 조절에 관여하는 mPFC 활성화가 증가하고 자율신경 균형이 회복되어, 인문 치유 프로그램이 외상 후 과각성 완화에 기여함을 시사합니다.',
-  pearson: {
-    rows: ['RSES', 'WHOQOL', 'BDI-II', 'GAD-7', 'CAPS-5', 'PCL-5'],
-    cols: ['H-PCL-5', 'H-CAPS-5', 'H-GAD-7', 'H-BDI-II', 'H-WHOQOL', 'H-RSES'],
-    values: [
-      [0.55, 0.61, 0.58, 0.64, 0.79, 0.93],
-      [0.59, 0.63, 0.60, 0.72, 0.95, 0.71],
-      [0.66, 0.70, 0.68, 0.94, 0.74, 0.62],
-      [0.72, 0.77, 0.96, 0.71, 0.65, 0.60],
-      [0.81, 0.95, 0.74, 0.69, 0.62, 0.58],
-      [0.94, 0.83, 0.70, 0.66, 0.60, 0.57],
-    ],
-  },
-  similarity: [
-    { pair: 'H-PCL-5 ↔ PTSD 증상 체크리스트', value: 96.1 },
-    { pair: 'H-CAPS-5 ↔ 임상가 면담 평가', value: 93.4 },
-    { pair: 'H-GAD-7 ↔ 범불안장애척도', value: 94.7 },
-    { pair: 'H-BDI-II ↔ 벡 우울 척도', value: 90.8 },
-  ],
-  similarityNote: '인문학 기반 설문 척도가 기존 임상 지표와 높은 유사도를 보여, 외상군 인문 치유 프로그램 평가에 활용 가능함을 시사합니다.',
-  ttest: {
-    n: 214,
-    rows: [
-      { pair: 'PCL-5 ↔ H-PCL-5', diff: 0.58, t: 1.64, p: 0.288 },
-      { pair: 'CAPS-5 ↔ H-CAPS-5', diff: 0.47, t: 1.22, p: 0.374 },
-      { pair: 'GAD-7 ↔ H-GAD-7', diff: 0.61, t: 1.55, p: 0.302 },
-      { pair: 'BDI-II ↔ H-BDI-II', diff: 0.55, t: 1.78, p: 0.261 },
-      { pair: 'WHOQOL ↔ H-WHOQOL', diff: 0.49, t: 1.31, p: 0.398 },
-      { pair: 'RSES ↔ H-RSES', diff: 0.53, t: 1.69, p: 0.284 },
-    ],
-  },
+/* 기존 임상 척도 ↔ 인문 척도 상관. 짝이 되는 자리(대각선)가 높게 나온다 */
+function pearsonOf(condition) {
+  const codes = SURVEY_CODES[condition] ?? []
+  return {
+    rows: [...codes].reverse(),
+    cols: codes.map((code) => `H-${code}`),
+    values: [...codes].reverse().map((row) =>
+      codes.map((col) => {
+        if (row === col) return Math.round((0.9 + (hash(`${row}:${col}`) % 90) / 1000) * 100) / 100
+        return Math.round((0.55 + (hash(`${condition}:${row}:${col}`) % 35) / 100) * 100) / 100
+      }),
+    ),
+  }
 }
 
-const DATA = { 게임과몰입: GAME, PTSD: PTSD }
+function similarityOf(condition) {
+  return (SURVEY_CODES[condition] ?? []).slice(0, 4).map((code) => ({
+    pair: `H-${code} ↔ ${surveys[code].name}`,
+    value: Math.round((88 + (hash(`sim:${condition}:${code}`) % 100) / 10) * 10) / 10,
+  }))
+}
+
+function ttestOf(condition) {
+  return {
+    n: 200 + (hash(`n:${condition}`) % 80),
+    rows: (SURVEY_CODES[condition] ?? []).map((code) => {
+      const seed = hash(`t:${condition}:${code}`)
+      return {
+        pair: `${code} ↔ H-${code}`,
+        diff: Math.round((0.4 + (seed % 40) / 100) * 100) / 100,
+        t: Math.round((0.9 + ((seed >>> 7) % 110) / 100) * 100) / 100,
+        /* 두 척도가 다르지 않다는 것이 이 검정의 결론이라 p가 크다 */
+        p: Math.round((0.24 + ((seed >>> 13) % 200) / 1000) * 1000) / 1000,
+      }
+    }),
+  }
+}
+
+/*
+ * 진단별 고정값. 척도에 딸린 것(사전·사후 · 피어슨 · 유사도 · T-검정)은
+ * 설문 목록에서 만들고, 여기에는 **척도와 무관한 값**만 남긴다 —
+ * HRV·fNIRS 요약과 해석 문구다.
+ *
+ * ⚠️ 게임과몰입의 HRV·fNIRS 수치와 문구는 웹 화면에 적혀 있던 값이고,
+ *    PTSD 쪽은 같은 골격으로 채운 임의값이다.
+ */
+const SUMMARY = {
+  게임과몰입: {
+    /* 방향: up이면 값이 커지는 것이 좋아지는 것이다 */
+    hrv: [
+      { label: 'SDNN (ms)', pre: 42.3, post: 58.7, better: 'up' },
+      { label: 'LF/HF Ratio', pre: 2.41, post: 1.82, better: 'down' },
+    ],
+    fnirs: { label: 'DLPFC', pre: 0.34, post: 0.61 },
+    note: '충동 조절 억제 신경망인 DLPFC 활성화가 유의하게 증가하여, 인문 치유 프로그램이 게임과몰입 환자의 전전두엽 기능 회복과 임상적 완화 효과에 기여함을 시사합니다.',
+    similarityNote: '인문학 기반 설문 척도가 기존 임상 지표와 높은 유사도를 보여, 증상군별 인문 치유 프로그램 평가에 활용 가능함을 시사합니다.',
+  },
+  PTSD: {
+    hrv: [
+      { label: 'SDNN (ms)', pre: 38.6, post: 51.4, better: 'up' },
+      { label: 'LF/HF Ratio', pre: 2.87, post: 2.05, better: 'down' },
+    ],
+    fnirs: { label: 'mPFC', pre: 0.29, post: 0.52 },
+    note: '위협 반응 조절에 관여하는 mPFC 활성화가 증가하고 자율신경 균형이 회복되어, 인문 치유 프로그램이 외상 후 과각성 완화에 기여함을 시사합니다.',
+    similarityNote: '인문학 기반 설문 척도가 기존 임상 지표와 높은 유사도를 보여, 외상군 인문 치유 프로그램 평가에 활용 가능함을 시사합니다.',
+  },
+}
 
 export function effectivenessOf(condition) {
-  const base = DATA[condition] ?? GAME
+  const key = SUMMARY[condition] ? condition : CONDITIONS[0]
   return {
-    ...base,
+    ...SUMMARY[key],
+    scales: scalesOf(key),
+    pearson: pearsonOf(key),
+    similarity: similarityOf(key),
+    ttest: ttestOf(key),
     /* 상관표는 볼 때 만든다. 네 블록을 전부 들고 있을 이유가 없다 */
-    bio: Object.fromEntries(BIO_BLOCKS.map((block) => [block, blockOf(condition, block)])),
+    bio: Object.fromEntries(BIO_BLOCKS.map((block) => [block, blockOf(key, block)])),
   }
 }
 

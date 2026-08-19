@@ -1,11 +1,12 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Printer, PencilLine, Check, ArrowRight } from 'lucide-vue-next'
+import { Printer, PencilLine, Check, ArrowRight, Activity } from 'lucide-vue-next'
 import { processFor } from '../mocks/processLibrary.js'
 import { PROCESS_STEPS, stepIndexOf, completionOf } from '../mocks/process.js'
 import { surveys, responseOf, answeredCount } from '../mocks/surveys.js'
 import InlineCallout from './InlineCallout.vue'
+import BioSignalModal from './BioSignalModal.vue'
 import { josa } from '../text.js'
 
 /*
@@ -74,6 +75,14 @@ const items = computed(() => {
 /* 다음 단계로 넘어가려면 **모든 설문이 작성**되어야 한다. 빠진 채로 처방할 수 없다 */
 const remaining = computed(() => items.value.filter((row) => !row.done).length)
 
+/*
+ * 생체신호. **프로세스가 정한다** — 설문 구성과 같은 자리다(정의의 `bio`).
+ * 버튼은 언제나 보이되 쓰지 않는 프로세스에서는 사유를 말한다. 감추면
+ * 이 프로세스에 그런 단계가 있는지조차 알 수 없다.
+ */
+const bioOpen = ref(false)
+const usesBio = computed(() => process.value?.bio !== false)
+
 const blocked = ref(null)
 
 function say(event, title, detail) {
@@ -87,6 +96,14 @@ function pickPhase(item, event) {
     return
   }
   phase.value = item.key
+}
+
+function openBio(event) {
+  if (!usesBio.value) {
+    say(event, '이 프로세스는 생체신호를 재지 않습니다', '측정이 필요하면 생체신호를 포함한 프로세스로 재할당하세요')
+    return
+  }
+  bioOpen.value = true
 }
 
 function openSurvey(row, event) {
@@ -192,6 +209,18 @@ const percent = (value, max) => `${Math.min(100, Math.max(0, (value / max) * 100
               {{ item.label }}
             </button>
           </div>
+
+          <!-- 생체신호. 쓰지 않는 프로세스에서는 흐리게 두고 누르면 사유를 말한다 -->
+          <button class="flex h-11 shrink-0 items-center" @click="openBio">
+            <span
+              class="flex items-center gap-1 rounded-lg border px-3 py-2 text-caption"
+              :class="usesBio
+                ? 'border-border-default text-text-secondary active:bg-surface-pressed'
+                : 'border-border-default text-text-disabled'"
+            >
+              <Activity :size="16" class="shrink-0" />생체신호
+            </span>
+          </button>
 
           <button
             class="flex h-11 shrink-0 items-center"
@@ -306,6 +335,9 @@ const percent = (value, max) => `${Math.min(100, Math.max(0, (value / max) * 100
         </span>
       </button>
     </div>
+
+    <!-- 생체신호 등록. 시점을 물려준다 — 어느 시점에 잰 값인지가 정해져야 한다 -->
+    <BioSignalModal v-if="bioOpen" :patient="patient" :phase="phase" @close="bioOpen = false" />
 
     <Teleport to="body">
       <div v-if="blocked" class="fixed inset-0 z-50" @click="blocked = null">

@@ -33,6 +33,12 @@ const pick = (codes) => codes.map((code) => ({ code, label: surveys[code].name }
 
 const PTSD_SURVEYS = pick(['PCL-5', 'CAPS-5', 'GAD-7', 'WHOQOL-BREF'])
 
+/* 진단별 감정평가 구성. 효과성 분석 화면도 이 목록을 센다 */
+export const SURVEY_CODES = {
+  PTSD: ['PCL-5', 'CAPS-5', 'GAD-7', 'WHOQOL-BREF'],
+  게임과몰입: ['IGDS9-SF', 'YIAS', 'LEC-5', 'BDI-II', 'BAI', 'K-CBCL', 'RSES'],
+}
+
 const GAME_SURVEYS = pick(['IGDS9-SF', 'YIAS', 'LEC-5', 'BDI-II', 'BAI', 'K-CBCL', 'RSES'])
 
 /* 프로그램 처방·수행의 내용은 전부 임시값이다 */
@@ -53,8 +59,19 @@ const sessions = (total) =>
     label: i === 0 ? '오리엔테이션 · 목표 설정' : `핵심 활동 ${i}`,
   }))
 
-const P = (id, name, condition, author, date, summary, steps, deprecated = false) => ({
-  id, name, condition, author, date, summary, steps, deprecated,
+/*
+ * `bio` = 이 프로세스가 **생체신호를 함께 재는가**.
+ *
+ * 환자마다 장비를 대는 것이 아니라 프로세스가 정하는 값이다 — 설문 구성을
+ * 프로세스가 정하는 것과 같은 자리다. 감정평가 화면의 '생체신호' 버튼은
+ * 언제나 보이되, 이 값이 false면 눌렀을 때 사유를 말한다(무반응 금지).
+ *
+ * ⚠️ 실제로는 백엔드가 내려줄 값이다. 지금은 정의에 박아 두고 두 상태를
+ *    모두 시연할 수 있게 해 두었다 — v2.1은 요약에 '생체신호 미입력'이라
+ *    적혀 있어 false다.
+ */
+const P = (id, name, condition, author, date, summary, steps, deprecated = false, bio = true) => ({
+  id, name, condition, author, date, summary, steps, deprecated, bio,
 })
 
 const ptsdSteps = (total) => [
@@ -80,7 +97,7 @@ export const processLibrary = [
     'pl-1', 'PTSD 표준 프로세스_v2.1', 'PTSD',
     '강치유 · 중앙대학교산학협력단', '2026-06-17',
     'PTSD 시연 프로세스 (변형 A: 생체신호 미입력·프로그램 선연결, 사전/사후 감정평가 4종)',
-    ptsdSteps(8),
+    ptsdSteps(8), false, false,
   ),
   P(
     'pl-2', 'PTSD 단축형_v1.3', 'PTSD',

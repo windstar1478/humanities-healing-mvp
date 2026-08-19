@@ -136,7 +136,7 @@ const significant = (p) => p < ALPHA
             <div
               v-for="scale in pagedScales"
               :key="scale.code"
-              class="flex flex-col gap-1 rounded-lg border border-border-default px-3 py-2"
+              class="flex h-[168px] flex-col gap-1 rounded-lg border border-border-default px-3 py-2"
             >
               <span class="truncate text-label font-medium">{{ scale.code }}</span>
               <span class="truncate text-count text-text-secondary">{{ scale.name }}</span>
@@ -145,19 +145,41 @@ const significant = (p) => p < ALPHA
                 p = {{ scale.p.toFixed(3) }}
               </span>
 
-              <div class="mt-1 flex h-[86px] items-end gap-4 px-2">
-                <div
-                  v-for="bar in [
-                    { key: 'pre', label: '사전', value: scale.pre, tone: 'bg-chart-bar-default' },
-                    { key: 'post', label: '사후', value: scale.post, tone: 'bg-chart-bar-strong' },
-                  ]"
-                  :key="bar.key"
-                  class="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
-                >
-                  <span class="text-count font-medium">{{ bar.value }}</span>
-                  <span class="w-10 rounded-t" :class="bar.tone" :style="{ height: barHeight(bar.value, scale.max) }"></span>
-                  <span class="text-count text-text-secondary">{{ bar.label }}</span>
-                </div>
+              <!--
+                눈금과 막대가 같은 자를 쓴다. 값 라벨을 막대 위에 얹는 것은
+                라벨을 흐름에 두면 그만큼 트랙이 줄어 높이가 총점과 어긋나기 때문이다.
+              -->
+              <div class="mt-1 flex flex-1 gap-1">
+                <span class="flex w-[22px] shrink-0 flex-col justify-between text-right text-count text-text-secondary">
+                  <span v-for="mark in [scale.max, Math.round(scale.max / 2), 0]" :key="mark">{{ mark }}</span>
+                </span>
+                <span class="relative min-w-0 flex-1">
+                  <span
+                    v-for="(at, i) in [0, 50, 100]"
+                    :key="i"
+                    class="absolute inset-x-0 border-t border-border-subtle"
+                    :style="{ top: `${at}%` }"
+                  ></span>
+                  <span class="absolute inset-0 flex items-end gap-2 px-2">
+                    <span
+                      v-for="bar in [
+                        { key: 'pre', label: '사전', value: scale.pre, tone: 'bg-chart-bar-default' },
+                        { key: 'post', label: '사후', value: scale.post, tone: 'bg-chart-bar-strong' },
+                      ]"
+                      :key="bar.key"
+                      class="relative min-w-0 flex-1 rounded-t"
+                      :class="bar.tone"
+                      :style="{ height: barHeight(bar.value, scale.max) }"
+                    >
+                      <span class="absolute inset-x-0 -top-4 text-center text-count font-medium">{{ bar.value }}</span>
+                    </span>
+                  </span>
+                </span>
+              </div>
+              <div class="flex gap-1 pl-[23px]">
+                <span v-for="label in ['사전', '사후']" :key="label" class="min-w-0 flex-1 text-center text-count text-text-secondary">
+                  {{ label }}
+                </span>
               </div>
             </div>
           </div>
