@@ -3,7 +3,7 @@ import { ref, computed, nextTick } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Check, Play, User,
-  ArrowUp, ArrowDown, Plus, Search, Pencil, Trash2,
+  ArrowUp, ArrowDown, Plus, Search, Pencil, Trash2, KeyRound,
 } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import {
@@ -15,6 +15,7 @@ import { notesOf, addNote, updateNote, removeNote } from '../mocks/notes.js'
 import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
 import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
 import InlineCallout from '../components/InlineCallout.vue'
+import AccessCodeModal from '../components/AccessCodeModal.vue'
 import { josa } from '../text.js'
 import { progressOfPatient, sessionProgress } from '../mocks/progress.js'
 
@@ -26,6 +27,12 @@ import { progressOfPatient, sessionProgress } from '../mocks/progress.js'
  */
 const route = useRoute()
 const router = useRouter()
+
+/*
+ * 환자 접속 코드. 환자가 자기 화면에 들어오는 유일한 길이라(4.0.7절)
+ * 발급 자리가 환자를 다루는 화면 안에 있어야 한다.
+ */
+const codeOpen = ref(false)
 
 const patient = computed(() => patients.find((p) => p.id === route.params.id) ?? null)
 
@@ -357,6 +364,13 @@ onBeforeRouteLeave((to, from) => {
           <span class="text-caption font-normal">&nbsp;{{ patient.age }}·{{ patient.sex }}</span>
         </span>
       </span>
+      <button
+        class="flex h-11 shrink-0 items-center gap-1 rounded-lg px-3 text-label font-medium text-text-secondary active:bg-surface-pressed"
+        @click="codeOpen = true"
+      >
+        <KeyRound :size="16" class="shrink-0" />
+        <span>접속 코드</span>
+      </button>
       <button
         class="flex h-11 w-[81px] shrink-0 items-center justify-center gap-1 rounded-lg text-label font-medium text-text-secondary active:bg-surface-pressed"
         @click="goBack"
@@ -781,6 +795,9 @@ onBeforeRouteLeave((to, from) => {
       @confirm="confirmDelete"
       @close="deleting = null"
     />
+
+    <!-- 환자 접속 코드. 환자가 자기 화면에 들어오는 유일한 길이다 -->
+    <AccessCodeModal v-if="codeOpen" :patient="patient" @close="codeOpen = false" />
 
     <!-- 편집 중 이탈 경고. 탭 전환 · 다른 메모 · 화면 이탈이 모두 여기로 모인다 -->
     <UnsavedWarningModal

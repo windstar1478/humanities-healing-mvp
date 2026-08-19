@@ -1,7 +1,8 @@
 import { GENERAL, PROCESS } from './home.js'
 import { processFor } from './processLibrary.js'
 import { responseOf } from './surveys.js'
-import { findProgram } from './programs.js'
+import { programs, findProgram } from './programs.js'
+import { historyOf } from './process.js'
 import { progressOf } from './sessions.js'
 
 /*
@@ -16,6 +17,16 @@ import { progressOf } from './sessions.js'
  * 값은 화면이 따로 들지 않고 전부 원본에서 읽는다 —
  * 설문 응답은 `surveys.js`, 회차 진행은 `sessions.js`가 원본이다.
  */
+
+/* 씨앗. 목업 곳곳과 같은 FNV-1a다 — 새로고침해도 값이 달라지면 안 된다 */
+function hash(text) {
+  let h = 2166136261
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
 
 /* 감정평가 단계의 설문 진행. 프로세스가 정한 구성을 그대로 센다 */
 function surveyProgress(patient, phase) {
@@ -115,4 +126,45 @@ export function visitDetail(patient, type) {
   }
 
   return PROCESS
+}
+
+/*
+ * 환자가 자기 화면에서 보는 **프로그램 단위 기록**.
+ *
+ * 상담사 화면은 프로세스 이력(`PTSD_v1.0`)을 행으로 세지만, 환자에게 내부
+ * 프로세스 이름과 버전을 그대로 보이면 안 된다 — 환자가 참여한 것은 프로그램이고,
+ * 프로세스는 그 프로그램을 어떤 절차로 붙였는가에 대한 우리 쪽 관리 단위다.
+ *
+ * ⚠️ 지난 프로그램이 무엇이었는지는 목업에 없다(이력에는 버전만 있다).
+ *    진단에 맞는 프로그램 중에서 **환자 id와 버전을 해시해 결정론적으로** 고른다.
+ *    실제 기록이 오면 이 함수만 바꾼다.
+ */
+function pastProgram(patient, version) {
+  const pool = programs.filter((item) => item.condition === patient.condition)
+  const list = pool.length ? pool : programs
+  return list[hash(`${patient.id}:${version}`) % list.length]
+}
+
+export function programRecordsOf(patient) {
+  if (!patient) return []
+  const running = findProgram(patient.programId)
+  const run = sessionProgress(patient)
+
+  return [...historyOf(patient)].reverse().map((entry) => {
+    const live = entry.state === '진행 중'
+    /* 진행 중인데 아직 처방 전이면 붙일 프로그램이 없다. 지어내지 않는다 */
+    const program = live ? running : pastProgram(patient, entry.id)
+    const total = program?.sessions.length ?? 0
+    const done = live ? (run?.done ?? 0) : total
+
+    return {
+      id: entry.id,
+      title: program?.name ?? '프로그램 준비 중',
+      period: entry.period.trim(),
+      state: live ? '진행 중' : '종료',
+      running: live,
+      sessions: program ? `${total}회차 중 ${done}회 완료` : '상담사가 프로그램을 고르고 있습니다',
+      percent: total ? Math.round((done / total) * 100) : 0,
+    }
+  })
 }

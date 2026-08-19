@@ -6,9 +6,8 @@ import { session, signOut, COUNSELOR } from '../authState.js'
 import { patients } from '../mocks/patients.js'
 import { processFor } from '../mocks/processLibrary.js'
 import { surveys, responseOf, answeredCount } from '../mocks/surveys.js'
-import { stepIndexOf, historyOf, keyMetricsOf, metricPoints, completionOf } from '../mocks/process.js'
-import { sessionProgress } from '../mocks/progress.js'
-import { findProgram } from '../mocks/programs.js'
+import { stepIndexOf, keyMetricsOf, metricPoints, completionOf } from '../mocks/process.js'
+import { sessionProgress, programRecordsOf } from '../mocks/progress.js'
 import { visitsOf } from '../scheduleState.js'
 import { dayLabel } from '../mocks/schedule.js'
 
@@ -129,32 +128,11 @@ const changeText = computed(() => {
 })
 
 /* ── 치유 기록 ──────────────────────────────────────────────────
- * 프로세스 이력을 그대로 읽는다. 진행률은 진행 중일 때만 계산한다 —
- * 끝난 것은 100%이고, 지어낼 값이 없다.
+ * **프로그램 단위다.** 환자가 참여한 것은 프로그램이고, 프로세스 이름과
+ * 버전(`PTSD_v1.0`)은 우리 쪽 관리 단위라 환자 화면에 내밀지 않는다.
+ * 판정은 `mocks/progress.js` 한 곳이다.
  */
-const program = computed(() => (patient.value ? findProgram(patient.value.programId) : null))
-
-const records = computed(() => {
-  if (!patient.value) return []
-  const name = (id) => `${patient.value.condition}_${id}`
-  return [...historyOf(patient.value)].reverse().map((entry) => {
-    const running = entry.state === '진행 중'
-    return {
-      id: entry.id,
-      /* 제목은 언제나 프로세스 이름이다. 진행 중만 프로그램명으로 바뀌면 규칙이 섞인다 */
-      title: name(entry.id),
-      period: entry.period.trim(),
-      state: running ? '진행 중' : '종료',
-      running,
-      /* 진행률은 지나온 단계 수다. 회차만 세면 처방 전 단계가 0%로 남는다 */
-      percent: running ? Math.round((step.value / 6) * 100) : 100,
-      detail: running
-        ? [program.value?.name, sessions.value && `${sessions.value.total}회차 중 ${sessions.value.done}회 완료`]
-          .filter(Boolean).join(' · ')
-        : entry.entries[entry.entries.length - 1]?.value ?? '',
-    }
-  })
-})
+const records = computed(() => programRecordsOf(patient.value))
 
 const ended = computed(() => (patient.value ? completionOf(patient.value) : null))
 
@@ -201,7 +179,7 @@ function leave() {
 
         <!-- 얼마나 달라졌는지. 좋고 나쁨은 적지 않는다 -->
         <div v-if="changeText" class="mt-1 shrink-0 text-label text-text-secondary">
-          <span class="font-medium text-text-primary">{{ active?.label }}</span> {{ changeText }}
+          <span class="font-medium text-text-primary">{{ active?.patientLabel }}</span> {{ changeText }}
         </div>
 
         <div class="mt-2 flex shrink-0 flex-wrap gap-1">
@@ -214,7 +192,7 @@ function leave() {
               : 'border-border-default text-text-secondary active:bg-surface-pressed'"
             @click="picked = metric.id"
           >
-            {{ metric.label }}
+            {{ metric.patientLabel }}
           </button>
         </div>
 
@@ -351,7 +329,7 @@ function leave() {
         >
           <span class="flex w-[300px] shrink-0 flex-col">
             <span class="truncate text-label font-medium">{{ record.title }}</span>
-            <span class="truncate text-count text-text-secondary">{{ record.detail }}</span>
+            <span class="truncate text-count text-text-secondary">{{ record.sessions }}</span>
           </span>
           <span class="w-[190px] shrink-0 text-count text-text-secondary">{{ record.period }}</span>
           <span

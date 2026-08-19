@@ -215,12 +215,20 @@ export function runningEntry(patient) {
  * 지표마다 좋아지는 방향이 달라(우울은 낮을수록, 회복탄력성은 높을수록)
  * 화살표는 증감만 나타내고 색은 중립으로 둔다 — Figma도 그렇다.
  */
+/*
+ * 지표에는 이름이 둘이다.
+ *
+ * `label`은 상담사가 보는 임상 용어이고, `patientLabel`은 환자가 자기 화면에서
+ * 보는 말이다. **환자에게 '강박성'·'우울'을 그대로 내밀면 화면이 진단서가 된다** —
+ * 판정은 상담사가 설명할 몫이고, 환자 화면은 무엇이 달라졌는지만 말한다(4.0.8절).
+ * 한 배열에 나란히 두는 것은 두 곳에 적으면 짝이 어긋나기 때문이다.
+ */
 const keyMetrics = [
-  { id: 'depression', label: '우울 · 불안' },
-  { id: 'obsession', label: '강박성' },
-  { id: 'existence', label: '존재 인정' },
-  { id: 'control', label: '감정 통제감' },
-  { id: 'resilience', label: '회복탄력성' },
+  { id: 'depression',  label: '우울 · 불안',   patientLabel: '마음의 무게' },
+  { id: 'obsession',   label: '강박성',        patientLabel: '반복되는 생각' },
+  { id: 'existence',   label: '존재 인정',     patientLabel: '나를 받아들이는 마음' },
+  { id: 'control',     label: '감정 통제감',   patientLabel: '감정 다루기' },
+  { id: 'resilience',  label: '회복탄력성',    patientLabel: '다시 힘내는 힘' },
 ]
 
 /* 추이 그래프의 x축. 사전 → 8회차 → 종료 */

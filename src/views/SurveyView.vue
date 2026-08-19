@@ -43,10 +43,19 @@ function pick(index, score) {
   draft.value.answers[index] = score
 }
 
+/*
+ * 제출 뒤가 세션에 따라 갈린다.
+ *
+ * **상담사가 건네준 경우에만 완료 알림 화면을 거친다.** 그 화면의 목적은
+ * 태블릿이 아직 환자 손에 있을 때 상담사용으로 곧장 돌아가지 않게 막는 것이다.
+ * 환자가 자기 화면에서 열었다면 돌아갈 곳이 자기 화면이라 막을 것이 없고,
+ * '태블릿을 전달해 주세요'도 맞지 않는 말이 된다 — 바로 되돌린다.
+ */
 function submit() {
   if (!complete.value) return
   submitSurvey(route.params.patientId, phase.value, route.params.code)
   submitted.value = true
+  if (patientSession()) backToCounselor()
 }
 
 /*

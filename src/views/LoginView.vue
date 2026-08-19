@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Stethoscope, User, ArrowRight } from 'lucide-vue-next'
 import { signIn } from '../authState.js'
-import { patientByCode, SAMPLE_CODE } from '../mocks/accessCodes.js'
+import { patientByCode, sampleCode } from '../mocks/accessCodes.js'
 import { josa } from '../text.js'
 import InlineCallout from '../components/InlineCallout.vue'
 
@@ -78,7 +78,7 @@ function submit(event) {
   const first = active.value.fields[0]
   if (!form.value[first.key]?.trim()) {
     say(event, `${josa(first.label, '을', '를')} 입력해 주세요`, role.value === 'patient'
-      ? `시연용 코드: ${SAMPLE_CODE}`
+      ? `시연용 코드: ${sampleCode()}`
       : '프로토타입이라 값은 검사하지 않습니다')
     return
   }
@@ -90,7 +90,7 @@ function submit(event) {
   if (role.value === 'patient') {
     const patient = patientByCode(form.value.code)
     if (!patient) {
-      say(event, '확인할 수 없는 코드입니다', `상담사에게 다시 받아 주세요 · 시연용 코드: ${SAMPLE_CODE}`)
+      say(event, '확인할 수 없는 코드입니다', `상담사에게 다시 받아 주세요 · 시연용 코드: ${sampleCode()}`)
       return
     }
     signIn('patient', { name: patient.name, patientId: patient.id })
@@ -164,7 +164,7 @@ const blockedStyle = computed(() => {
 
       <p class="mt-3 text-center text-count text-text-secondary">
         <template v-if="role === 'patient'">
-          프로토타입입니다. 코드는 소진되지 않습니다 · 시연용 코드 {{ SAMPLE_CODE }}
+          프로토타입입니다. 코드는 소진되지 않습니다 · 시연용 코드 {{ sampleCode() }}
         </template>
         <template v-else>
           프로토타입입니다. 입력한 값은 검사하지 않고 어디에도 보내지 않습니다.
