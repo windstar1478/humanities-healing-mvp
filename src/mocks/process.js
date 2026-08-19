@@ -173,16 +173,16 @@ export function historyOf(patient) {
 }
 
 /*
- * 핵심 지표. delta는 사전 대비 변화량이다.
+ * 핵심 지표의 축. 값은 여기 없다 — 환자마다 다르므로 아래 keyMetricsOf가 만든다.
  * 지표마다 좋아지는 방향이 달라(우울은 낮을수록, 회복탄력성은 높을수록)
  * 화살표는 증감만 나타내고 색은 중립으로 둔다 — Figma도 그렇다.
  */
-export const keyMetrics = [
-  { id: 'depression', label: '우울 · 불안', value: 58, delta: -14 },
-  { id: 'obsession', label: '강박성', value: 67, delta: 3 },
-  { id: 'existence', label: '존재 인정', value: 43, delta: -2 },
-  { id: 'control', label: '감정 통제감', value: 52, delta: 14 },
-  { id: 'resilience', label: '회복탄력성', value: 51, delta: 6 },
+const keyMetrics = [
+  { id: 'depression', label: '우울 · 불안' },
+  { id: 'obsession', label: '강박성' },
+  { id: 'existence', label: '존재 인정' },
+  { id: 'control', label: '감정 통제감' },
+  { id: 'resilience', label: '회복탄력성' },
 ]
 
 /* 추이 그래프의 x축. 사전 → 8회차 → 종료 */
@@ -191,16 +191,58 @@ export const metricPoints = [
 ]
 
 /*
- * 아직 도달하지 않은 회차는 값이 없다.
- * 첫 값이 사전, 마지막 값이 keyMetrics의 현재값과 같다 (차이가 delta다).
- * 우울·불안만 Figma 실측이고 나머지 넷은 임의로 채웠다 — 확인 필요.
+ * 지표를 환자별로 만든다.
+ *
+ * 명단 40명이 모두 같은 그래프를 보고 있었다. 값의 산출 규칙은 아직 확인되지
+ * 않았으므로 **간단한 임의 규칙**을 둔다 — 실제 규칙이 나오면 이 함수만 바꾼다.
+ *
+ *   1. 환자 id와 지표 id를 함께 해시해 사전값(40~75)을 정한다
+ *   2. 지표마다 좋아지는 방향이 다르다(우울·불안은 내려가고 회복탄력성은 올라간다).
+ *      그 방향으로 회차마다 1~3씩 움직인다
+ *   3. 점의 개수는 **지나온 회차 수**를 따른다 — 아직 하지 않은 회차의 값을
+ *      그리면 화면이 없는 사실을 지어낸다
+ *
+ * ⚠️ 전부 임의값이다. 6.2절 7번(상세 치유 프로세스 정보) 참조.
  */
-export const metricSeries = {
-  depression: [72, 70, 66, 61, 59, 58],
-  obsession: [64, 65, 63, 66, 66, 67],
-  existence: [45, 44, 46, 45, 44, 43],
-  control: [38, 41, 44, 47, 50, 52],
-  resilience: [45, 46, 48, 49, 50, 51],
+function hash(text) {
+  let h = 2166136261
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+/* 값이 커지는 것이 좋아지는 지표만 여기 있다. 나머지는 내려가야 좋아진다 */
+const HIGHER_IS_BETTER = new Set(['control', 'resilience', 'existence'])
+
+export function metricSeriesOf(patient, metricId, points) {
+  const seed = hash(`${patient.id}:${metricId}`)
+  const start = 40 + (seed % 36)
+  const dir = HIGHER_IS_BETTER.has(metricId) ? 1 : -1
+  const series = [start]
+  for (let i = 1; i < points; i += 1) {
+    const stepSize = 1 + ((seed >>> (i % 8)) % 3)
+    const next = series[i - 1] + dir * stepSize
+    series.push(Math.min(95, Math.max(15, next)))
+  }
+  return series
+}
+
+/*
+ * 화면에 오르는 지표. 값은 마지막 점이고 delta는 사전 대비 변화량이다 —
+ * 그래프와 카드가 같은 배열에서 나와야 둘이 갈라지지 않는다.
+ */
+export function keyMetricsOf(patient, points) {
+  return keyMetrics.map((metric) => {
+    const series = metricSeriesOf(patient, metric.id, points)
+    return {
+      ...metric,
+      value: series[series.length - 1],
+      delta: series[series.length - 1] - series[0],
+      series,
+    }
+  })
 }
 
 /* 눈금은 20 폭에 5칸으로 고정한다. 지표마다 값의 범위가 달라 화면이 계산한다 */

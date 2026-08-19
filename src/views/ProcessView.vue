@@ -8,6 +8,7 @@ import InlineCallout from '../components/InlineCallout.vue'
 import ProcessStartStep from '../components/ProcessStartStep.vue'
 import EmotionReviewStep from '../components/EmotionReviewStep.vue'
 import ProgramPrescribeStep from '../components/ProgramPrescribeStep.vue'
+import ProgramExecuteStep from '../components/ProgramExecuteStep.vue'
 
 /*
  * 코어 프로세스 6단계의 공통 셸 (Figma 148:7242 · 148:7729 · 173:5511 ·
@@ -174,6 +175,12 @@ const blockedStyle = computed(() => {
         v-else-if="step === 2"
         :patient="patient"
         @advance="prescribe"
+      />
+      <!-- 3단계. 마지막 회차를 마치면 사후 감정평가로 넘어간다 -->
+      <ProgramExecuteStep
+        v-else-if="step === 3"
+        :patient="patient"
+        @advance="advance"
       />
       <div v-else class="flex min-h-0 flex-1 items-center justify-center">
         <p class="text-body text-text-disabled">

@@ -9,7 +9,7 @@ import { patients } from '../mocks/patients.js'
 import {
   PROCESS_STEPS, stepIndexOf, stepStateOf, SESSION_TOTAL, SESSION_CURRENT,
   processHistory, historyOf, CURRENT_VERSION,
-  keyMetrics, metricPoints, metricSeries, SCALE_SPAN, SCALE_STEPS,
+  keyMetricsOf, metricPoints, SCALE_SPAN, SCALE_STEPS,
 } from '../mocks/process.js'
 import { notesOf, addNote, updateNote, removeNote } from '../mocks/notes.js'
 import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
@@ -120,9 +120,21 @@ const openHistory = ref(processHistory.find((h) => h.state === '진행 중')?.id
  * 값과 눈금이 한 좌표계를 쓰도록 SVG로 그린다.
  * 절대 좌표로 점을 찍으면 데이터가 바뀔 때 눈금과 어긋난다.
  */
-const selectedMetric = ref(keyMetrics[0].id)
-const activeMetric = computed(() => keyMetrics.find((m) => m.id === selectedMetric.value))
-const series = computed(() => metricSeries[selectedMetric.value] ?? [])
+/*
+ * 지표는 환자별로 만든다(mocks/process.js의 임의 규칙).
+ * 점의 개수는 지나온 회차 수를 따른다 — 사전 한 점에 완료한 회차만큼 더한다.
+ */
+const metricPointCount = computed(() => {
+  const step = currentStep.value
+  if (step < 3) return 1
+  if (step > 3) return metricPoints.length
+  return Math.min(metricPoints.length, 1 + SESSION_CURRENT)
+})
+
+const keyMetrics = computed(() => keyMetricsOf(patient.value, metricPointCount.value))
+const selectedMetric = ref('depression')
+const activeMetric = computed(() => keyMetrics.value.find((m) => m.id === selectedMetric.value))
+const series = computed(() => activeMetric.value?.series ?? [])
 
 const PLOT = { width: 1000, height: 200 }
 

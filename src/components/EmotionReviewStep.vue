@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Printer, PencilLine, Check, ArrowRight } from 'lucide-vue-next'
 import { processFor } from '../mocks/processLibrary.js'
-import { PROCESS_STEPS } from '../mocks/process.js'
+import { PROCESS_STEPS, stepIndexOf } from '../mocks/process.js'
 import { surveys, responseOf, answeredCount } from '../mocks/surveys.js'
 import InlineCallout from './InlineCallout.vue'
 
@@ -43,6 +43,14 @@ const reachable = (item) => item.step <= props.step
 
 const process = computed(() => processFor(props.patient))
 
+/*
+ * **지나간 단계는 고칠 수 없다.** 다음 단계로 넘어간 뒤에도 응답을 바꿀 수 있으면
+ * 그 뒤 단계가 이미 참조한 점수(프로그램 처방의 등급·감정 지표)와 어긋난다.
+ * 진행 중인 단계에서는 그대로 다시 열 수 있다 — 잘못 찍은 응답을 되돌릴 길은
+ * 그 단계 안에 남아 있어야 한다.
+ */
+const locked = computed(() => props.step < stepIndexOf(props.patient))
+
 /* 프로세스가 정한 설문 구성을 그대로 쓴다. 화면이 목록을 따로 들지 않는다 */
 const items = computed(() => {
   const steps = process.value?.steps ?? []
@@ -80,11 +88,19 @@ function pickPhase(item, event) {
   phase.value = item.key
 }
 
-function openSurvey(row) {
+function openSurvey(row, event) {
+  if (locked.value) {
+    say(event, '이미 지난 단계의 감정평가입니다', '기록을 보려면 결과 점수를 확인하세요')
+    return
+  }
   router.push({ path: `/survey/${props.patient.id}/${phase.value}/${row.survey.code}` })
 }
 
 function advance(event) {
+  if (locked.value) {
+    say(event, '이미 지난 단계입니다', `지금은 ${PROCESS_STEPS[stepIndexOf(props.patient)] ?? ''} 단계입니다`)
+    return
+  }
   if (remaining.value) {
     say(event, '아직 작성되지 않은 설문이 있습니다', `${remaining.value}종을 마치면 열립니다`)
     return
@@ -218,12 +234,14 @@ const percent = (value, max) => `${Math.min(100, Math.max(0, (value / max) * 100
             작성완료도 누를 수 있다. 응답을 다시 보거나 고치는 자리라 —
             완료를 막으면 잘못 찍은 응답을 되돌릴 길이 없다
           -->
-          <button class="flex h-11 shrink-0 items-center" @click="openSurvey(row)">
+          <button class="flex h-11 shrink-0 items-center" @click="openSurvey(row, $event)">
             <span
               class="flex h-9 items-center justify-center gap-2 rounded-lg border px-3 text-body"
-              :class="row.done
-                ? 'border-border-strong bg-border-default active:bg-surface-pressed-strong'
-                : 'border-border-default active:bg-surface-pressed'"
+              :class="locked
+                ? 'border-border-default bg-surface-field text-text-disabled'
+                : row.done
+                  ? 'border-border-strong bg-border-default active:bg-surface-pressed-strong'
+                  : 'border-border-default active:bg-surface-pressed'"
             >
               <component :is="row.done ? Check : PencilLine" :size="16" class="shrink-0" />
               <template v-if="row.done">작성완료</template>
@@ -243,7 +261,7 @@ const percent = (value, max) => `${Math.min(100, Math.max(0, (value / max) * 100
       <button class="flex h-11 items-center" @click="advance">
         <span
           class="flex h-9 min-w-[176px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-3 text-body"
-          :class="remaining
+          :class="remaining || locked
             ? 'border-border-default bg-surface-field text-text-disabled'
             : 'border-border-default bg-surface-inverse text-text-inverse active:bg-surface-inverse-pressed'"
         >
