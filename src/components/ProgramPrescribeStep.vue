@@ -51,7 +51,8 @@ const query = ref('')
 const sortKey = ref('recommend')
 const openPanel = ref(null)
 const filters = reactive(Object.fromEntries(PROGRAM_FILTERS.map((f) => [f.id, null])))
-const picked = ref(null)
+/* 이미 처방된 환자는 그 프로그램이 골라진 채로 열린다 — 무엇을 붙였는지 되비쳐야 한다 */
+const picked = ref(props.patient.programId ?? null)
 const detail = ref(null)
 
 const sortLabel = computed(() => PROGRAM_SORTS.find((s) => s.key === sortKey.value).label)
