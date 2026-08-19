@@ -1,5 +1,6 @@
 import { patients } from './patients.js'
-import { stepIndexOf } from './process.js'
+import { stepIndexOf, completeProcess } from './process.js'
+import { shiftedKey } from './schedule.js'
 import { processLibrary } from './processLibrary.js'
 import { programs } from './programs.js'
 import { surveys, draftOf, submitSurvey, saveSurveyDraft } from './surveys.js'
@@ -64,6 +65,32 @@ function fillSurvey(patient, phase, code, seed, { severity, ratio }) {
   else saveSurveyDraft(patient.id, phase, code)
 }
 
+/*
+ * 사후 응답은 **사전 응답에서 한 단계씩 내려간 값**이다.
+ * severity만 바꿔 다시 뽑으면 사전과 같은 점수가 나오는 환자가 생겨
+ * 프로세스 종료 화면의 사전·사후 비교가 '변화 없음'만 가득 찬다.
+ * 사전을 읽어 낮추면 모든 환자에게서 방향이 같은 변화가 나온다.
+ * ⚠️ '한 단계씩'은 임의 규칙이다. 실제 값이 오면 이 함수만 바꾼다.
+ */
+function fillPostFromPre(patient, code, ratio) {
+  const survey = surveys[code]
+  const pre = draftOf(patient.id, 'pre', code)
+  const draft = draftOf(patient.id, 'post', code)
+  const lowest = Math.min(...survey.scale.map((o) => o.score))
+  const step = survey.scale.length > 1
+    ? Math.abs(survey.scale[1].score - survey.scale[0].score)
+    : 1
+  const count = Math.max(1, Math.round(survey.questions.length * ratio))
+
+  for (let i = 0; i < count; i += 1) {
+    const before = pre.answers[i] ?? lowest
+    draft.answers[i] = Math.max(lowest, before - step)
+  }
+
+  if (ratio >= 1) submitSurvey(patient.id, 'post', code)
+  else saveSurveyDraft(patient.id, 'post', code)
+}
+
 function surveysAt(process, phase) {
   const step = process.steps.find((s) => s.name.includes(phase === 'pre' ? '사전' : '사후'))
   return step?.items ?? []
@@ -121,20 +148,31 @@ export function seedPatients() {
       patient.programName = program.name
     }
 
-    /* 사후 감정평가(4단계). 사전과 같은 규칙이고, 사후는 대개 점수가 내려간다 */
+    /* 사후 감정평가(4단계). 사전에서 내려간 값이라 방향이 언제나 같다 */
     if (step >= 4) {
-      const after = severity === 'high' ? 'mid' : 'low'
       const list = surveysAt(process, 'post')
       list.forEach((item, i) => {
         if (step === 4) {
           const done = i < (seed % (list.length + 1))
-          if (done) fillSurvey(patient, 'post', item.code, seed + i, { severity: after, ratio: 1 })
-          else if (i === (seed % (list.length + 1))) {
-            fillSurvey(patient, 'post', item.code, seed + i, { severity: after, ratio: 0.4 })
-          }
+          if (done) fillPostFromPre(patient, item.code, 1)
+          else if (i === (seed % (list.length + 1))) fillPostFromPre(patient, item.code, 0.4)
           return
         }
-        fillSurvey(patient, 'post', item.code, seed + i, { severity: after, ratio: 1 })
+        fillPostFromPre(patient, item.code, 1)
+      })
+    }
+
+    /*
+     * 이미 끝난 프로세스에도 **종료 시각**이 있어야 한다. 종료 확정을 거치지 않고
+     * 명단에서 바로 '완료'로 태어난 환자들이라, 이것이 없으면 프로세스 종료
+     * 화면이 기간도 종료 시각도 비운 채 열린다.
+     */
+    if (patient.process === '완료') {
+      const key = shiftedKey(-(3 + (seed % 30)))
+      const pad = (n) => String(n).padStart(2, '0')
+      completeProcess(patient, {
+        date: key.replaceAll('-', '.'),
+        at: `${key} ${pad(9 + (seed % 8))}:${pad((seed % 4) * 15)}`,
       })
     }
   })

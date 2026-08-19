@@ -1,15 +1,17 @@
 <script setup>
 import { ref, reactive, computed, watch, useTemplateRef, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Search } from 'lucide-vue-next'
 import { GENERAL, PROCESS } from '../mocks/home.js'
 import { recentPatients, allPatients } from '../mocks/patients.js'
 import { dayLabel, shortDayLabel } from '../mocks/schedule.js'
+import { progressOfPatient, visitDetail } from '../mocks/progress.js'
 import { openHoursOn, duplicateOn, addEvent, addTask, placeTask, moveEvent } from '../scheduleState.js'
 import ModalShell from './ModalShell.vue'
 
 /*
  * 배치 확인 · 일정 추가 · 작업 추가가 쓰는 공용 모달.
- * 대상 선택 · 환자 검색 · 중복 경고 · nextStep 검증까지 전부 여기 있다.
+ * 대상 선택 · 환자 검색 · 중복 경고까지 전부 여기 있다.
  * 화면마다 다시 구현하면 규칙이 한쪽에만 남아 우회 경로가 생긴다.
  * Figma 화면이 없는 초안이다.
  */
@@ -29,6 +31,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'placed'])
+
+const router = useRouter()
 
 /* 날짜·시간을 '미정'으로 고른 상태. 업무에서만 고를 수 있다 */
 const UNSET = 'unset'
@@ -158,16 +162,40 @@ const movingTaskId = computed(() =>
   props.mode === 'drop' && props.drop?.itemKind === 'task' ? props.drop.item.id : null,
 )
 
-const nextStep = computed(() => activePatient.value?.nextStep ?? null)
-const patientRuleOk = computed(() => visitType.value === GENERAL || Boolean(nextStep.value))
+/*
+ * 지금 이 환자가 어디까지 왔는지. 약속을 잡는 자리에서 현재 상황이 보이지
+ * 않으면 프로세스가 없는 환자에게 프로세스 일정을 잡거나, 절반만 끝낸
+ * 감정평가를 처음부터 다시 하는 것으로 오해할 수 있다.
+ */
+const progress = computed(() => progressOfPatient(activePatient.value))
+
+/*
+ * 프로세스가 배정되지 않은 환자를 치유 프로세스로 잡으려 할 때의 확인.
+ * 막지 않고 알린다 — 프로세스 개시(0단계)에서 할당하기로 하고 그 뒤의
+ * 감정평가 자리를 미리 잡아두는 것은 정상적인 순서다.
+ * 중복 경고와 같은 문법이다: 버튼 행만 확인 상태로 바뀌고 '돌아가기'는 닫지 않는다.
+ */
+const unassigned = ref(false)
+const needsAssignWarning = computed(
+  () => visitType.value === PROCESS && Boolean(progress.value?.unassigned),
+)
+
+/*
+ * 배치 유형의 기본값. 프로세스가 끝났거나 끊긴 환자를 만나는 일은
+ * 프로세스 안의 일이 아니므로 일반 상담으로 연다.
+ */
+function defaultTypeFor(patient) {
+  if (!patient) return PROCESS
+  return patient.process === '완료' || patient.process === '중단' ? GENERAL : PROCESS
+}
 
 const canConfirm = computed(() => {
   if (needsDate.value && !form.date) return false
   /* 날짜가 미정이면 고를 시간 자체가 없다 */
   if (needsHour.value && activeDate.value && !form.hour) return false
   if (isWork.value) return form.title.trim().length > 0 || props.mode === 'drop'
-  if (props.mode === 'add-event' || isEdit.value) return Boolean(form.patient) && patientRuleOk.value
-  return activePatient.value ? patientRuleOk.value : true
+  if (props.mode === 'add-event' || isEdit.value) return Boolean(form.patient)
+  return true
 })
 
 const title = computed(() => {
@@ -179,7 +207,35 @@ const title = computed(() => {
 
 function pickPatient(patient) {
   form.patient = patient
-  visitType.value = patient.nextStep ? PROCESS : GENERAL
+  visitType.value = defaultTypeFor(patient)
+}
+
+/*
+ * 프로세스가 없는 환자는 **먼저 배정하러 간다.** 여기서 그대로 배치하면
+ * 무엇을 하는 자리인지 정해지지 않은 일정이 남는다 — 프로세스가 붙어야
+ * 감정평가든 프로그램 수행이든 할 일이 생긴다.
+ * 잡던 일정은 배정을 마친 뒤 다시 잡는다.
+ */
+const leaveTo = ref(null)
+function goAssign() {
+  leaveTo.value = `/process/${activePatient.value.id}/0`
+  dismiss()
+}
+
+/*
+ * 이동은 모달이 닫힌 **뒤에** 한다. 셸이 올려둔 history 엔트리를 라우터가
+ * 걷어내기 전에 push하면 모달 엔트리가 스택에 남는다.
+ */
+function onClose() {
+  emit('close')
+  if (leaveTo.value) router.push(leaveTo.value)
+}
+
+/* 경고에서 '돌아가기'는 모달을 닫지 않는다. 고르던 자리로 되돌린다 */
+function stepBack() {
+  if (duplicate.value) duplicate.value = null
+  else if (unassigned.value) unassigned.value = false
+  else dismiss()
 }
 
 function subjectName() {
@@ -210,6 +266,12 @@ function confirm() {
   }
 
   const hour = props.mode === 'drop' ? (props.drop.hour ?? form.hour) : form.hour
+
+  /* 프로세스가 없는 환자를 치유 프로세스로 잡는 것은 확인을 거친다 */
+  if (needsAssignWarning.value && !unassigned.value) {
+    unassigned.value = true
+    return
+  }
 
   if (!duplicate.value) {
     const found = duplicateOn(activeDate.value, subjectName(), movingTaskId.value, editingId.value)
@@ -245,7 +307,8 @@ function buildPatientEvent(hour) {
   return {
     hour,
     title: patient.name,
-    meta: `${patient.condition} · ${visitType.value === PROCESS ? nextStep.value : GENERAL}`,
+    /* 그때 무엇을 하는 자리였는지는 일정이 자기 데이터로 들고 있어야 한다 */
+    meta: `${patient.condition} · ${visitDetail(patient, visitType.value)}`,
     bar: true,
     badge: null,
   }
@@ -259,7 +322,7 @@ onMounted(() => {
    */
   if (props.mode === 'drop') {
     form.hour = null
-    visitType.value = props.drop?.item?.nextStep ? PROCESS : GENERAL
+    visitType.value = defaultTypeFor(props.drop?.itemKind === 'patient' ? props.drop.item : null)
   } else if (props.mode === 'add-task') {
     form.hour = UNSET
   } else if (isEdit.value) {
@@ -274,6 +337,7 @@ onMounted(() => {
 /* 환자로 되돌아오면 '미정'은 고를 수 없는 값이 된다. 원래 날짜로 되돌린다 */
 watch(() => form.subjectKind, () => {
   duplicate.value = null
+  unassigned.value = false
   if (form.date === UNSET) form.date = props.dateKey ?? null
   if (form.hour === UNSET) form.hour = null
 })
@@ -282,11 +346,17 @@ watch(() => form.subjectKind, () => {
 watch(() => form.date, () => {
   form.hour = null
   duplicate.value = null
+  unassigned.value = false
+})
+
+/* 유형을 바꾸면 경고의 전제가 사라진다 */
+watch(visitType, () => {
+  unassigned.value = false
 })
 </script>
 
 <template>
-  <ModalShell ref="shell" :name="mode" @close="emit('close')">
+  <ModalShell ref="shell" :name="mode" @close="onClose">
     <!-- 중복 경고. 취소하면 모달을 닫지 않고 원래 폼으로 돌아간다 -->
     <template v-if="duplicate">
       <h2 class="text-title-sm font-semibold">이미 배치된 대상입니다</h2>
@@ -294,6 +364,24 @@ watch(() => form.date, () => {
         {{ dayLabel(activeDate) }} {{ duplicate.hour }}에
         <span class="text-text-primary">{{ duplicate.title }}</span> 일정이 이미 있습니다.
         그래도 배치할까요?
+      </p>
+    </template>
+
+    <!--
+      프로세스 미배정 경고. 막지 않고 알린다 — 프로세스 할당은 0단계에서 하고,
+      그 뒤의 감정평가 자리를 미리 잡아두는 것은 정상적인 순서다.
+    -->
+    <template v-else-if="unassigned">
+      <h2 class="text-title-sm font-semibold">치유 프로세스가 배정되지 않았습니다</h2>
+      <p class="mt-2 text-body text-text-secondary">
+        <span class="text-text-primary">{{ activePatient?.name }}</span> 환자는 아직
+        <span class="text-text-primary">{{ progress?.step }}</span> 상태입니다.
+      </p>
+      <p class="mt-1 text-body text-text-secondary">
+        프로세스를 배정해야 이 자리에서 진행할 단계가 정해집니다.
+      </p>
+      <p class="mt-3 text-body text-text-secondary">
+        <span class="text-text-primary">프로세스 시작</span> 단계로 이동할까요?
       </p>
     </template>
 
@@ -407,6 +495,19 @@ watch(() => form.date, () => {
 
       <!-- 환자 일정은 드롭이든 추가든 같은 규칙을 탄다 -->
       <template v-if="activePatient">
+        <!--
+          단계 이름만으로는 '감정평가 중'이 하나도 안 한 것인지 넷 중 셋을 끝낸
+          것인지 알 수 없다. 몇 개 중 몇 개인지까지 함께 낸다.
+        -->
+        <p v-if="progress" class="mt-4 flex flex-wrap items-baseline gap-x-2 text-label">
+          <span class="font-medium text-text-secondary">현재 진행</span>
+          <span class="text-text-primary">{{ progress.step }}</span>
+          <span
+            v-if="progress.detail"
+            :class="progress.tone === 'warning' ? 'text-indicator-warning' : 'text-text-secondary'"
+          >· {{ progress.detail }}</span>
+        </p>
+
         <p class="mt-4 text-label font-medium text-text-secondary">유형</p>
         <div class="mt-2 flex flex-wrap gap-2">
           <button
@@ -425,11 +526,6 @@ watch(() => form.date, () => {
             </span>
           </button>
         </div>
-        <!-- 단계는 고르는 게 아니라 환자 데이터가 정한다 -->
-        <p v-if="visitType === PROCESS" class="mt-3 text-label text-text-secondary">
-          <template v-if="nextStep">다음 단계 · <span class="font-medium text-text-primary">{{ nextStep }}</span></template>
-          <template v-else>남은 프로세스 단계가 없습니다</template>
-        </p>
       </template>
 
       <!-- 날짜가 정해지지 않았거나(캘린더 상단) 바꿀 수 있으면(업무) 고른다 -->
@@ -506,17 +602,17 @@ watch(() => form.date, () => {
 
     <template #actions>
       <!-- 중복 경고의 취소는 모달을 닫지 않는다. 고르던 자리로 되돌린다 -->
-      <button class="flex h-11 items-center" @click="duplicate ? (duplicate = null) : dismiss()">
+      <button class="flex h-11 items-center" @click="stepBack">
         <span class="flex h-9 items-center rounded-lg border border-border-default px-3 text-body active:bg-surface-pressed">
-          {{ duplicate ? '돌아가기' : '취소' }}
+          {{ duplicate || unassigned ? '돌아가기' : '취소' }}
         </span>
       </button>
-      <button class="flex h-11 items-center" :disabled="!canConfirm" @click="confirm">
+      <button class="flex h-11 items-center" :disabled="!canConfirm" @click="unassigned ? goAssign() : confirm()">
         <span
           class="flex h-9 items-center rounded-lg px-3 text-body"
           :class="canConfirm ? 'bg-surface-inverse text-text-inverse active:bg-surface-inverse-pressed' : 'bg-surface-field text-text-disabled'"
         >
-          {{ duplicate ? '그래도 배치' : asTask ? '추가' : isEdit ? '저장' : '배치' }}
+          {{ duplicate ? '그래도 배치' : unassigned ? '프로세스 배정하러 가기' : asTask ? '추가' : isEdit ? '저장' : '배치' }}
         </span>
       </button>
     </template>

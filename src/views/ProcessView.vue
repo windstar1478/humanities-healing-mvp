@@ -3,12 +3,13 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Check, Play, User } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
-import { PROCESS_STEPS, STATUS_OF_STEP, stepIndexOf, stepStateOf } from '../mocks/process.js'
+import { PROCESS_STEPS, STATUS_OF_STEP, stepIndexOf, stepStateOf, completeProcess } from '../mocks/process.js'
 import InlineCallout from '../components/InlineCallout.vue'
 import ProcessStartStep from '../components/ProcessStartStep.vue'
 import EmotionReviewStep from '../components/EmotionReviewStep.vue'
 import ProgramPrescribeStep from '../components/ProgramPrescribeStep.vue'
 import ProgramExecuteStep from '../components/ProgramExecuteStep.vue'
+import ProcessCompleteStep from '../components/ProcessCompleteStep.vue'
 
 /*
  * 코어 프로세스 6단계의 공통 셸 (Figma 148:7242 · 148:7729 · 173:5511 ·
@@ -44,8 +45,18 @@ function advance() {
   const next = step.value + 1
   patient.value.status = STATUS_OF_STEP[next] ?? patient.value.status
   patient.value.nextStep = STATUS_OF_STEP[next + 1] ?? null
-  /* 프로세스를 '완료'로 바꾸는 것은 마지막 단계의 종결 조작이다. 여기서 하지 않는다 */
   router.push({ path: `/process/${patient.value.id}/${next}` })
+}
+
+/*
+ * 종결. 사후 감정평가의 '종료 확정'만 여기로 온다.
+ * 프로세스를 '완료'로 바꾸고 종료 시각을 남기는 일은 `completeProcess` 한 곳이다 —
+ * 화면이 환자 레코드를 직접 고치면 이력을 닫는 일이 빠진다.
+ */
+function complete() {
+  /* 이미 끝난 프로세스를 다시 종결하지 않는다. 종료 시각이 오늘로 덮인다 */
+  if (patient.value.process !== '완료') completeProcess(patient.value)
+  router.push({ path: `/process/${patient.value.id}/5` })
 }
 
 /* 처방은 프로그램을 환자에게 붙이는 일이다. 그 뒤 단계 이동은 advance와 같다 */
@@ -168,7 +179,7 @@ const blockedStyle = computed(() => {
         v-else-if="step === 1 || step === 4"
         :patient="patient"
         :step="step"
-        @advance="advance"
+        @advance="step === 4 ? complete() : advance()"
       />
       <!-- 2단계. 고른 프로그램은 환자 레코드에 남는다 -->
       <ProgramPrescribeStep
@@ -182,6 +193,8 @@ const blockedStyle = computed(() => {
         :patient="patient"
         @advance="advance"
       />
+      <!-- 5단계. 결정하는 화면이 아니라 결과를 보여주는 화면이다 -->
+      <ProcessCompleteStep v-else-if="step === 5" :patient="patient" />
       <div v-else class="flex min-h-0 flex-1 items-center justify-center">
         <p class="text-body text-text-disabled">
           {{ PROCESS_STEPS[step] }} 단계는 준비 중입니다

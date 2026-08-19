@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
-import { TODAY_KEY, shiftedKey } from './schedule.js'
+import { TODAY_KEY } from './schedule.js'
+import { visitDatesOf } from '../scheduleState.js'
 import { stepIndexOf } from './process.js'
 
 /*
@@ -34,10 +35,27 @@ const NOTES = [
 ]
 
 /*
- * 회차 일정은 **주 1회**다. 지금 회차가 오늘이고, 지난 회차는 매주 거슬러,
- * 남은 회차는 매주 앞으로 잡힌다. 실제로는 일정에서 와야 할 값이다 — 확인 필요.
+ * 회차 날짜는 **일정에서 온다**. 회차를 언제 하는지는 상담사가 잡은 약속이
+ * 정하는 값이지 회차 기록이 스스로 만들어낼 값이 아니다 — 여기서 날짜를
+ * 지어내면 일정 화면과 프로그램 수행 화면이 서로 다른 날을 말한다.
+ *
+ * 끝낸 회차는 지난 진료일을 뒤에서부터, 남은 회차는 앞으로 잡힌 진료일을
+ * 앞에서부터 가져간다. **약속이 모자라면 그 회차는 날짜가 없다** —
+ * 없는 약속을 있는 것처럼 그리지 않는다. 잡아야 할 것이 남았다는 뜻이다.
+ * (일정을 다시 잡으면 그 자리에서 따라오도록 열 때마다 다시 매긴다)
  */
-const dateAt = (index, current) => shiftedKey((index - current) * 7)
+function applyDates(patient, progress) {
+  const { past, upcoming } = visitDatesOf(patient.name)
+  const done = progress.current
+  /* 끝낸 회차 수보다 지난 진료가 적을 수 있다. 뒤에서부터 맞춘다 */
+  const behind = past.slice(-done)
+  const offset = done - behind.length
+  progress.entries.forEach((entry, i) => {
+    const next = i < done ? behind[i - offset] ?? null : upcoming[i - done] ?? null
+    /* 같은 값을 다시 쓰지 않는다. 읽는 자리(computed)에서 부르므로 조용해야 한다 */
+    if (entry.date !== next) entry.date = next
+  })
+}
 
 function init(patient, program) {
   const seed = hash(`${patient.id}:${program.id}`)
@@ -54,7 +72,7 @@ function init(patient, program) {
 
   const entries = program.sessions.map((name, i) => ({
     name,
-    date: dateAt(i, Math.min(current, total - 1)),
+    date: null,
     done: i < current,
     note: i < current ? NOTES[(seed + i) % NOTES.length] : '',
     savedAt: null,
@@ -67,11 +85,17 @@ export function progressOf(patient, program) {
   const saved = state[patient.id]
   /* 프로그램이 바뀌면(재처방) 기록도 새로 시작한다 */
   if (!saved || saved.programId !== program.id) init(patient, program)
+  applyDates(patient, state[patient.id])
   return state[patient.id]
 }
 
-/* 회차 라벨. 오늘·예정을 앞에 붙여 언제인지 한눈에 읽히게 한다 */
+/*
+ * 회차 라벨. 오늘·예정을 앞에 붙여 언제인지 한눈에 읽히게 한다.
+ * 약속이 아직 없는 회차는 '일정 미정'이다 — 잡아야 할 것이 남았다는 뜻이라
+ * 날짜를 지어내 채우면 안 된다.
+ */
 export function sessionWhen(entry) {
+  if (!entry.date) return '일정 미정'
   if (entry.done) return entry.date
   if (entry.date === TODAY_KEY) return `오늘 · ${entry.date}`
   return `예정 · ${entry.date}`

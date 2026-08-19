@@ -138,6 +138,24 @@ export function visitsOf(name) {
   return { last, next }
 }
 
+/*
+ * 그 환자의 환자 일정 날짜를 지난 것과 남은 것으로 갈라 돌려준다.
+ * 프로그램 수행의 회차 날짜가 이것을 쓴다 — 회차를 언제 하는지는 일정이
+ * 정하는 값이지 회차 기록이 스스로 만들어낼 값이 아니다.
+ * 오늘 잡힌 일정은 시각이 지났어도 '남은 것'에 둔다. 지금 하고 있는 회차다.
+ */
+export function visitDatesOf(name) {
+  const past = []
+  const upcoming = []
+  Object.keys(scheduleState.byDate).sort().forEach((key) => {
+    scheduleState.byDate[key].forEach((event) => {
+      if (!event.bar || event.title !== name) return
+      ;(key < TODAY_KEY ? past : upcoming).push(key)
+    })
+  })
+  return { past, upcoming }
+}
+
 function hourState(key, hour) {
   if (key < TODAY_KEY) return 'past'
   if (key > TODAY_KEY) return 'upcoming'

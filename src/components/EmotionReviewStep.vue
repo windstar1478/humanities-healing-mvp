@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Printer, PencilLine, Check, ArrowRight } from 'lucide-vue-next'
 import { processFor } from '../mocks/processLibrary.js'
-import { PROCESS_STEPS, stepIndexOf } from '../mocks/process.js'
+import { PROCESS_STEPS, stepIndexOf, completionOf } from '../mocks/process.js'
 import { surveys, responseOf, answeredCount } from '../mocks/surveys.js'
 import InlineCallout from './InlineCallout.vue'
 
@@ -97,6 +97,11 @@ function openSurvey(row, event) {
 }
 
 function advance(event) {
+  /* 끝난 프로세스에서는 결과 화면으로 가는 길이다. 잠금 판정보다 앞선다 */
+  if (ended.value) {
+    emit('advance')
+    return
+  }
   if (locked.value) {
     say(event, '이미 지난 단계입니다', `지금은 ${PROCESS_STEPS[stepIndexOf(props.patient)] ?? ''} 단계입니다`)
     return
@@ -120,15 +125,38 @@ const blockedStyle = computed(() => {
 })
 
 /*
- * 다음 단계의 이름을 그대로 버튼에 쓴다 — 사전이면 '프로그램 처방으로',
- * 사후면 '프로세스 종료로'다. 라벨을 고정하면 사후 단계에서 틀린 곳을 가리킨다.
+ * 사전은 다음 단계의 이름을 그대로 버튼에 쓴다. 라벨을 고정하면 틀린 곳을 가리킨다.
  * 받침 유무로 조사가 갈린다(처방'으로' / 종료'로').
+ *
+ * **사후는 다르다** — 여기서 누르는 것이 프로세스를 끝내는 조작이라
+ * 라벨이 `종료 확정`이고, 무엇이 일어나는지 왼쪽에 한 줄로 밝힌다(Figma 186:6607).
+ * '이동'이라고 적으면 되돌릴 수 있는 화면 전환으로 읽힌다.
  */
+const isFinal = computed(() => props.step === 4)
+
+/*
+ * **이미 끝난 프로세스에는 종료를 묻지 않는다.** 완료 환자의 사후 화면을 다시
+ * 열어보는 경우가 있는데(스테퍼로 지나온 단계에 들어갈 수 있다), 그때도 확인
+ * 문구가 뜨면 아직 안 끝난 것으로 읽힌다. 언제 끝났는지를 대신 말하고
+ * 버튼은 결과 화면으로 가는 길이 된다.
+ */
+const ended = computed(() => isFinal.value && props.patient.process === '완료')
+const completion = computed(() => completionOf(props.patient))
+
 const nextLabel = computed(() => {
+  if (ended.value) return '프로세스 종료 보기'
+  if (isFinal.value) return '종료 확정'
   const name = PROCESS_STEPS[props.step + 1] ?? ''
   const last = name.charCodeAt(name.length - 1)
   const hasFinal = last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0
   return `${name}${hasFinal ? '으로' : '로'} 이동`
+})
+
+/* 확인 문구의 '현재 시각'. 종료 시각이 아니라 지금 언제인지를 알려주는 값이다 */
+const nowLabel = computed(() => {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 })
 
 /* 막대는 점수/총점이고, 세로 마커는 컷오프 자리다 */
@@ -257,11 +285,21 @@ const percent = (value, max) => `${Math.min(100, Math.max(0, (value / max) * 100
     </div>
 
     <!-- 다음 단계로. 전제조건(모든 설문 작성)을 채우지 못하면 비활성이다 -->
-    <div class="flex h-13 shrink-0 items-center justify-end border-t border-border-strong">
-      <button class="flex h-11 items-center" @click="advance">
+    <div class="flex h-13 shrink-0 items-center gap-2.5 border-t border-border-strong">
+      <!-- 사후에서는 이 버튼이 프로세스를 끝낸다. 무엇이 일어나는지 먼저 말한다 -->
+      <p v-if="ended" class="min-w-0 flex-1 truncate text-caption text-text-secondary">
+        이미 종료된 프로세스입니다.
+        <template v-if="completion">{{ completion.at }} 종료됨</template>
+      </p>
+      <p v-else-if="isFinal" class="min-w-0 flex-1 truncate text-caption">
+        <span class="font-bold">{{ patient.name }}</span> 환자의 프로세스를 종료하시겠습니까?
+        현재 시각: {{ nowLabel }}
+      </p>
+      <span v-else class="min-w-0 flex-1"></span>
+      <button class="flex h-11 shrink-0 items-center" @click="advance">
         <span
           class="flex h-9 min-w-[176px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-3 text-body"
-          :class="remaining || locked
+          :class="!ended && (remaining || locked)
             ? 'border-border-default bg-surface-field text-text-disabled'
             : 'border-border-default bg-surface-inverse text-text-inverse active:bg-surface-inverse-pressed'"
         >

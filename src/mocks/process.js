@@ -152,24 +152,66 @@ export function recordAssignment(patient, process) {
   }
 }
 
-export function historyOf(patient) {
-  const change = processChanges[patient.id]
-  if (!change) return processHistory
-  /* 돌아가던 항목을 닫는다. 원본은 건드리지 않고 사본을 만든다 */
-  const closed = processHistory.map((entry) => {
+/*
+ * 프로세스 종결. 감정평가(사후)의 '종료 확정'이 부르는 유일한 자리다.
+ *
+ * 종료 시각을 남기는 것은 프로세스 종료 화면이 `… 종료됨`으로 그것을 보여주기
+ * 때문이다. 화면이 열릴 때마다 지금 시각을 찍으면 볼 때마다 값이 달라진다 —
+ * 언제 끝났는지는 끝내는 순간에 정해지는 사실이다.
+ */
+const completions = reactive({})
+
+export function completeProcess(patient, stamp = null) {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  /* stamp는 목업 씨앗이 지난 날짜로 끝난 프로세스를 채울 때만 넘긴다 */
+  completions[patient.id] = stamp ?? {
+    date: todayDot(),
+    at: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  }
+  patient.status = '프로세스 종료'
+  patient.nextStep = null
+  patient.process = '완료'
+}
+
+export function completionOf(patient) {
+  return completions[patient.id] ?? null
+}
+
+/* 돌아가던 항목을 닫는다. 원본은 건드리지 않고 사본을 만든다 */
+function closeRunning(list, date, reason) {
+  return list.map((entry) => {
     if (entry.state !== '진행 중') return entry
     return {
       ...entry,
       state: '종료',
       /* 진행 중 항목의 기간은 `2026.06.12 ~`로 끝난다. 뒤에 종료일을 붙인다 */
-      period: `${entry.period.trim()} ${change.closed.date}`,
+      period: `${entry.period.trim()} ${date}`,
       entries: [
         ...entry.entries,
-        { date: change.closed.date, label: '프로세스 종료', value: change.closed.reason },
+        { date, label: '프로세스 종료', value: reason },
       ],
     }
   })
-  return [...closed, change.opened]
+}
+
+export function historyOf(patient) {
+  const change = processChanges[patient.id]
+  const done = completions[patient.id]
+
+  let list = processHistory
+  if (change) {
+    list = [...closeRunning(list, change.closed.date, change.closed.reason), change.opened]
+  }
+  /* 종결은 마지막에 적용한다. 재할당으로 열린 항목도 같은 규칙으로 닫힌다 */
+  if (done) list = closeRunning(list, done.date, '프로세스 정상 종료')
+  return list
+}
+
+/* 지금 돌아가고 있는(또는 마지막으로 돌아간) 이력 한 건 */
+export function runningEntry(patient) {
+  const list = historyOf(patient)
+  return list.find((entry) => entry.state === '진행 중') ?? list[list.length - 1] ?? null
 }
 
 /*
