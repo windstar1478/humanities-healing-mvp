@@ -46,10 +46,24 @@ export const PHASE_TYPES = ['도입', '투사', '통찰', '통합', '마무리']
 
 export const DIFFICULTIES = ['초급', '중급', '고급']
 
-/* 블록의 두 종류. 안내문은 치유사가 읽어 주는 말, 인문 문장은 인용하는 원문이다 */
+/*
+ * 블록의 두 종류.
+ *
+ * **안내문은 적고, 인문 문장은 고른다.** 인용하는 원문의 원본은 도서 콘텐츠이고
+ * (4.8.10절) 블록은 **도서 id + 문장 번호**로 가리키기만 한다 — 문장을 여기
+ * 옮겨 적으면 같은 문장이 자리마다 다시 적히고, 어느 책 몇 쪽에서 온 것인지도
+ * 남지 않는다. 데이터 명세가 필드를 가리키는 것과 같은 자리다(4.8.7절).
+ */
 export const BLOCK_KINDS = ['안내문', '인문 문장']
 
-const B = (kind, activity, text) => ({ kind, activity, text })
+const B = (kind, activity, text, bookId = null, sentence = null) =>
+  ({ kind, activity, text, bookId, sentence })
+
+/* 블록이 내용을 갖췄는가. 종류마다 채워야 하는 자리가 다르다 */
+export const blockFilled = (block) =>
+  block.kind === '인문 문장'
+    ? Boolean(block.bookId) && block.sentence !== null
+    : Boolean(block.text.trim())
 const PHASE = (type, title, blocks) => ({ type, title, blocks })
 
 const A = (id, name, spec) => ({ id, name, ...spec })
@@ -73,7 +87,8 @@ export const activities = reactive([
       ]),
       PHASE('투사', '투사', [
         B('안내문', '그리기', '떠오르는 장면을 종이 한가운데에 놓고 주변에 이어 붙인다.'),
-        B('인문 문장', '묵독하기', '기억은 지나간 시간이 아니라, 지금 다시 놓이는 자리다.'),
+        /* 문장은 도서 콘텐츠에서 가리킨다. 여기 적어 두지 않는다 */
+        B('인문 문장', '묵독하기', '', 'bk-1', 5),
       ]),
     ],
   }),
@@ -134,6 +149,7 @@ export const nextActivityId = () => `act-${activities.length + 1}-${Date.now().t
 /*
  * 저장. 오토세이브가 없으므로(3.6절) 저장 버튼에서만 불린다.
  * **빈 블록·빈 단계는 걷는다** — 내용이 없는 자리는 치유사가 읽을 것이 없다.
+ * 무엇이 채워진 것인지는 종류가 정한다(`blockFilled`).
  */
 export function saveActivity(draft) {
   const phases = draft.phases
@@ -141,11 +157,14 @@ export function saveActivity(draft) {
       type: phase.type,
       title: phase.title.trim() || phase.type,
       blocks: phase.blocks
-        .filter((block) => block.text.trim())
+        .filter(blockFilled)
         .map((block) => ({
           kind: block.kind,
           activity: block.activity,
-          text: block.text.trim(),
+          /* 인문 문장은 가리키기만 하므로 적어 둔 글은 버린다 */
+          text: block.kind === '인문 문장' ? '' : block.text.trim(),
+          bookId: block.kind === '인문 문장' ? block.bookId : null,
+          sentence: block.kind === '인문 문장' ? block.sentence : null,
         })),
     }))
     .filter((phase) => phase.blocks.length)

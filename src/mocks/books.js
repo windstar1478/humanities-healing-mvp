@@ -145,6 +145,34 @@ export const books = reactive([
 
 export const findBook = (id) => books.find((b) => b.id === id) ?? null
 
+/*
+ * **문장은 문단에서 끊어 낸다. 따로 저장하지 않는다.**
+ *
+ * 세션 활동의 `인문 문장` 블록이 문장을 가리키는데(4.8.9절), 문장을 복사해
+ * 두면 문단을 고쳤을 때 블록만 옛 문장을 계속 말한다. 가리키는 값은
+ * **도서 id + 문장 번호** 둘뿐이고 문장 자체는 읽을 때 여기서 만든다.
+ *
+ * 끊는 규칙은 마침표 · 물음표 · 느낌표 다음의 공백이다.
+ * ⚠️ 임의 규칙이다. 인용부호 안의 마침표나 줄임표는 갈라진다 —
+ *    실제 문장 단위가 정해지면 이 함수만 바꾼다. 6.2절 45번 항목 참조.
+ */
+export function sentencesOf(book) {
+  if (!book?.passage) return []
+  return book.passage
+    .split(/(?<=[.!?])\s+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+/*
+ * 가리킨 문장 하나. 문단이 짧아져 번호가 범위를 넘으면 **null이다** —
+ * 없는 문장을 지어내지 않고, 읽는 화면이 그 사실을 말한다.
+ */
+export function sentenceAt(bookId, index) {
+  const list = sentencesOf(findBook(bookId))
+  return list[index] ?? null
+}
+
 /* 목록 한 줄에 붙는 요약 */
 export const bookMeta = (b) => [
   b.type,

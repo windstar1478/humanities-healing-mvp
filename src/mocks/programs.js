@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { findActivity } from './activities.js'
+import { sentenceAt } from './books.js'
 
 /*
  * 인문 프로그램 라이브러리 mock (Figma 178:3788 · 179:4283 · 180:4914).
@@ -83,10 +84,18 @@ function phasesFromActivity(program, activity) {
     /* 메모가 없으면 주의할 것이 없다는 뜻이다 */
     caution: activity.note || '없음',
     staff: `${program.field} 치료사 1인`,
-    /* 블록 하나가 활동 한 줄이다. 종류가 제목이고 본문이 그 안의 말이다 */
+    /*
+     * 블록 하나가 활동 한 줄이다. 종류가 제목이고 본문이 그 안의 말이다.
+     * **인문 문장은 도서 콘텐츠에서 읽어 온다** — 문단이 짧아져 가리킨 문장이
+     * 없어졌으면 그 사실을 말한다. 없는 문장을 지어내지 않는다.
+     */
     activities: phase.blocks.map((block) => ({
       title: block.kind === '인문 문장' ? `${block.activity} · 인문 문장` : block.activity,
-      steps: [block.text],
+      steps: [
+        block.kind === '인문 문장'
+          ? sentenceAt(block.bookId, block.sentence) ?? '가리킨 문장을 찾을 수 없습니다'
+          : block.text,
+      ],
     })),
   }))
 }

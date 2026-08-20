@@ -4,8 +4,9 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ChevronLeft, ChevronUp, ChevronDown, Plus, Trash2, Check } from 'lucide-vue-next'
 import {
   activities, findActivity, saveActivity, nextActivityId,
-  ACTIVITY_KINDS, allKinds, PHASE_TYPES, DIFFICULTIES, BLOCK_KINDS,
+  ACTIVITY_KINDS, allKinds, PHASE_TYPES, DIFFICULTIES, BLOCK_KINDS, blockFilled,
 } from '../mocks/activities.js'
+import { books, findBook, sentencesOf } from '../mocks/books.js'
 import { dimensions } from '../mocks/analysis.js'
 import { josa } from '../text.js'
 import InlineCallout from '../components/InlineCallout.vue'
@@ -26,6 +27,10 @@ import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
  *   · 치유 구성요소 · 주제어 · 증상의 강도 · 치유대상 연령대 — 읽는 화면이 없다.
  *     받아도 입력한 사람이 반영됐는지 확인할 방법이 없다(4.8.4절의 축소 기준)
  * 치유대상 감정만 남긴 것은 **세션 상세가 그 값을 보여주기 때문이다**(4.6.3절).
+ *
+ * **인문 문장 블록은 적는 자리가 아니라 고르는 자리다.** 인용하는 원문의 원본은
+ * 도서 콘텐츠이고(4.8.10절) 블록은 도서와 문장 번호로 가리키기만 한다 —
+ * 데이터 명세가 필드를 만들지 않고 고르는 것과 같다(4.8.7절).
  *
  * 머리의 `초기화` · `미리보기`도 두지 않았다. 초기화는 미저장 되돌리기인데 이
  * 앱은 그것을 이탈 경고로 처리하고(3.6절), 미리보기는 아직 볼 화면이 없다.
@@ -72,7 +77,22 @@ const blockCount = computed(() =>
 )
 
 /* 새 블록은 첫 종류로 시작한다. 고르지 않은 채로 두면 무엇을 하는 자리인지 비어 있다 */
-const newBlock = () => ({ kind: BLOCK_KINDS[0], activity: allKinds()[0], text: '' })
+const newBlock = () => ({
+  kind: BLOCK_KINDS[0],
+  activity: allKinds()[0],
+  text: '',
+  bookId: null,
+  sentence: null,
+})
+
+/* 가리킬 수 있는 문장. 고른 도서의 문단을 끊어 낸 것이고 원본은 도서 콘텐츠다 */
+const sentencesFor = (bookId) => sentencesOf(findBook(bookId))
+
+/* 도서를 바꾸면 문장 번호는 다른 문단의 것이다. 남겨두면 엉뚱한 문장을 가리킨다 */
+function pickBook(block, id) {
+  block.bookId = id || null
+  block.sentence = null
+}
 
 function addPhase() {
   draft.value.phases.push({ type: PHASE_TYPES[0], title: '', blocks: [newBlock()] })
@@ -95,7 +115,7 @@ const deleting = ref(null)
 
 function askRemoveBlock(pi, bi) {
   const block = draft.value.phases[pi].blocks[bi]
-  if (!block.text.trim()) {
+  if (!blockFilled(block)) {
     draft.value.phases[pi].blocks.splice(bi, 1)
     return
   }
@@ -109,7 +129,7 @@ function askRemoveBlock(pi, bi) {
 
 function askRemovePhase(pi) {
   const phase = draft.value.phases[pi]
-  if (!phase.blocks.some((b) => b.text.trim())) {
+  if (!phase.blocks.some(blockFilled)) {
     draft.value.phases.splice(pi, 1)
     return
   }
@@ -136,8 +156,8 @@ const blocked = computed(() => {
   if (!d.summary.trim()) return '설명을 입력해 주세요'
   if (!Number(d.minutes)) return '소요시간을 입력해 주세요'
   if (!d.phases.length) return '치유단계를 하나 이상 만들어 주세요'
-  if (!d.phases.some((p) => p.blocks.some((b) => b.text.trim()))) {
-    return '블록의 본문을 하나 이상 채워 주세요'
+  if (!d.phases.some((phase) => phase.blocks.some(blockFilled))) {
+    return '블록의 본문을 채우거나 인용할 문장을 골라 주세요'
   }
   return null
 })
@@ -468,19 +488,62 @@ onBeforeRouteLeave((to, from) => {
                 </div>
               </div>
 
-              <label class="flex flex-col gap-1">
-                <span class="text-count text-text-secondary">
-                  {{ block.kind === '인문 문장' ? '인용할 문장' : '안내문 본문' }}
-                </span>
+              <!-- 안내문은 적는다 -->
+              <label v-if="block.kind !== '인문 문장'" class="flex flex-col gap-1">
+                <span class="text-count text-text-secondary">안내문 본문</span>
                 <textarea
                   v-model="block.text"
                   rows="2"
                   class="w-full rounded-lg border border-border-default bg-surface-field px-3 py-2 text-label text-text-primary"
-                  :placeholder="block.kind === '인문 문장'
-                    ? '인용할 문장을 입력하세요'
-                    : '안내문을 입력하세요'"
+                  placeholder="안내문을 입력하세요"
                 />
               </label>
+
+              <!-- 인문 문장은 도서 콘텐츠에서 고른다. 여기서 적지 않는다 -->
+              <div v-else class="flex flex-col gap-1">
+                <span class="text-count text-text-secondary">인용할 문장</span>
+                <select
+                  :value="block.bookId"
+                  class="h-11 w-full rounded-lg border border-border-default bg-surface-field px-3 text-label"
+                  :class="block.bookId ? 'text-text-primary' : 'text-text-secondary'"
+                  @change="pickBook(block, $event.target.value)"
+                >
+                  <option value="">도서를 고르세요</option>
+                  <option v-for="item in books" :key="item.id" :value="item.id">
+                    {{ item.title }} · {{ item.author }} · {{ item.pages }}쪽
+                  </option>
+                </select>
+
+                <div
+                  v-if="block.bookId"
+                  class="flex max-h-40 flex-col overflow-y-auto rounded-lg border border-border-default"
+                >
+                  <button
+                    v-for="(line, si) in sentencesFor(block.bookId)"
+                    :key="si"
+                    class="flex items-center gap-2 px-3 py-2 text-left"
+                    :class="[
+                      si > 0 && 'border-t border-border-subtle',
+                      block.sentence === si
+                        ? 'bg-selected-bg active:bg-selected-bg-pressed'
+                        : 'active:bg-surface-pressed',
+                    ]"
+                    @click="block.sentence = si"
+                  >
+                    <Check
+                      :size="12"
+                      class="shrink-0"
+                      :class="block.sentence === si ? 'text-text-primary' : 'text-transparent'"
+                    />
+                    <span class="min-w-0 flex-1 text-label">{{ line }}</span>
+                  </button>
+                </div>
+
+                <!-- 고르지 않았으면 무엇이 비었는지 말한다. 조용히 비워 두지 않는다 -->
+                <span v-if="!block.bookId || block.sentence === null" class="text-count text-text-secondary">
+                  {{ block.bookId ? '문장을 고르면 이 블록이 채워집니다' : '도서 콘텐츠에 등록된 문단에서 고릅니다' }}
+                </span>
+              </div>
             </div>
 
             <button
