@@ -44,8 +44,13 @@ const YESNO = [
   { label: '예', score: 1 },
 ]
 
-const S = (code, name, role, scope, spec) => ({
-  code, name, role, scope, ...spec,
+/*
+ * `kind` = 인문 / 임상. **척도가 어느 계보에서 온 것인가**를 말한다.
+ * 효과성 분석이 이미 이 구분을 쓰고 있다 — 인문 척도는 임상 원본의 코드에
+ * `H-`를 붙인 것이다(4.7절). 목업의 척도는 전부 임상 원본이라 기본값이 임상이다.
+ */
+const S = (code, name, role, scope, spec, kind = '임상') => ({
+  code, name, role, scope, kind, ...spec,
   /* 총점은 척도의 최고점 × 문항 수다. 목업에 손으로 적으면 문항을 고칠 때 갈라진다 */
   max: spec.questions.length * Math.max(...spec.scale.map((o) => o.score)),
 })
@@ -277,6 +282,9 @@ export const surveys = reactive({
 
 export const surveyOf = (code) => surveys[code] ?? null
 
+/* 척도의 계보. 인문 척도는 임상 원본의 코드에 `H-`를 붙인 것이다(4.7절) */
+export const SURVEY_KINDS = ['인문', '임상']
+
 /*
  * 척도 저작(저작도구)의 저장.
  *
@@ -293,6 +301,7 @@ export function saveSurvey(draft) {
     name: draft.name.trim(),
     role: draft.role,
     scope: draft.scope,
+    kind: draft.kind,
     summary: draft.summary.trim(),
     guide: draft.guide.trim(),
     lead: draft.lead?.trim() || draft.guide.trim(),

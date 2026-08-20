@@ -3,6 +3,7 @@ import { session } from './authState.js'
 import { findTool } from './mocks/authoring.js'
 import { surveys } from './mocks/surveys.js'
 import { findGroup } from './mocks/dataFields.js'
+import { findProcess } from './mocks/processLibrary.js'
 
 /*
  * 우측 환자 패널은 '환자를 다루는 화면'에만 붙는다.
@@ -101,6 +102,19 @@ const router = createRouter({
         to.params.group === 'new' || findGroup(to.params.group)
           ? true
           : { path: '/authoring/field', replace: true },
+    },
+    /*
+     * 프로세스 저작(MVP). 단계 골격은 코어 프로세스가 고정하고 있어
+     * 여기서는 그 안의 구성만 정한다.
+     */
+    {
+      path: '/authoring/process/:id',
+      component: () => import('./views/ProcessEditorView.vue'),
+      meta: { noPatientPanel: true },
+      beforeEnter: (to) =>
+        to.params.id === 'new' || findProcess(to.params.id)
+          ? true
+          : { path: '/authoring/process', replace: true },
     },
     /*
      * 저작도구 하나. 어느 도구인지가 경로에 들어간다 —

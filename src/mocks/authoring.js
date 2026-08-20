@@ -53,7 +53,7 @@ export const authoringTools = [
     /* 결과물은 surveys.js가 들고 있다 */
     items: () =>
       Object.values(surveys).map((s) =>
-        ROW(s.code, s.name, [s.code, `${s.questions.length}문항`, `총점 ${s.max}`], s.role),
+        ROW(s.code, s.name, [s.code, s.kind, `${s.questions.length}문항`, `총점 ${s.max}`], s.role),
       ),
     itemLabel: '척도',
     /*
@@ -107,6 +107,7 @@ export const authoringTools = [
         ROW(p.id, p.name, [p.condition, p.author, p.date], p.deprecated ? '구버전' : null),
       ),
     itemLabel: '프로세스',
+    editPath: (id) => `/authoring/process/${id ?? 'new'}`,
   },
   {
     key: 'program',

@@ -13,6 +13,7 @@
  *    같은 화면의 단계 메타가 `설문 4종`이다.
  */
 
+import { reactive } from 'vue'
 import { surveys } from './surveys.js'
 
 /* 감정평가 단계는 설문 수가 곧 메타다. 둘이 갈라지지 않게 여기서 센다 */
@@ -92,7 +93,7 @@ const gameSteps = (total) => [
  * 구버전은 목록에서 빼지 않는다 — 지난 프로세스로 진행한 환자의 이력을 읽으려면
  * 정의가 남아 있어야 한다. 흐리게 내리고 배지를 붙이는 것으로 구분한다.
  */
-export const processLibrary = [
+export const processLibrary = reactive([
   P(
     'pl-1', 'PTSD 표준 프로세스_v2.1', 'PTSD',
     '강치유 · 중앙대학교산학협력단', '2026-06-17',
@@ -144,7 +145,7 @@ export const processLibrary = [
     gameSteps(6),
     true,
   ),
-]
+])
 
 /*
  * 정렬 기준. 기본은 최신순이고, Figma에는 열린 상태가 없어 나머지는 초안이다.
@@ -174,3 +175,45 @@ export function processFor(patient) {
   /* 동반이환처럼 딱 맞는 정의가 없으면 가장 최근 것을 쓴다 */
   return matched[0] ?? processLibrary.find((p) => !p.deprecated) ?? null
 }
+
+/*
+ * 프로세스 저작(저작도구)의 저장.
+ *
+ * **단계 골격은 받지 않는다.** 코어 프로세스가 이미 네 단계로 고정돼 있고
+ * (감정평가 사전 → 프로그램 처방 → 프로그램 수행 → 감정평가 사후), 화면·스테퍼·
+ * `stepStateOf`가 전부 그 순서를 전제한다. 구버전 웹처럼 노드를 자유롭게 이으면
+ * **앱이 그릴 수 없는 정의**가 만들어진다. 저작이 정하는 것은 그 골격 안의
+ * 내용물뿐이다 — 감정평가 설문 구성 · 처방 후보 프로그램 · 수행 회기 수.
+ *
+ * 단계 메타(`설문 N종` · `총 N회기…`)도 여기서 만든다. 손으로 적게 하면
+ * 구성과 갈라진다.
+ */
+export function saveProcess(draft) {
+  const evalItems = pick(draft.surveyCodes)
+  const total = Math.max(1, Number(draft.sessionCount) || 1)
+
+  const next = {
+    id: draft.id,
+    name: draft.name.trim(),
+    condition: draft.condition,
+    author: draft.author.trim(),
+    date: draft.date,
+    summary: draft.summary.trim(),
+    steps: [
+      EVAL('감정평가(사전)', evalItems),
+      STEP('프로그램 처방', '', draft.programs.map((p) => ({ code: p.field, label: p.name }))),
+      STEP('프로그램 수행', `총 ${total}회기·${total}주·주 1회`, sessions(total)),
+      EVAL('감정평가(사후)', evalItems),
+    ],
+    deprecated: false,
+    bio: draft.bio,
+  }
+
+  const at = processLibrary.findIndex((p) => p.id === next.id)
+  if (at >= 0) processLibrary[at] = next
+  else processLibrary.unshift(next)
+  return next
+}
+
+/* 새 정의의 id. 목록 안에서만 유일하면 된다 */
+export const nextProcessId = () => `pl-${processLibrary.length + 1}-${Date.now().toString(36)}`

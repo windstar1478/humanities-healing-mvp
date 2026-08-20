@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ChevronLeft, Plus, Trash2 } from 'lucide-vue-next'
-import { surveys, surveyOf, saveSurvey } from '../mocks/surveys.js'
+import { surveys, surveyOf, saveSurvey, SURVEY_KINDS } from '../mocks/surveys.js'
 import { dimensions } from '../mocks/analysis.js'
 import InlineCallout from '../components/InlineCallout.vue'
 import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
@@ -42,6 +42,7 @@ function draftFrom(survey) {
     name: survey?.name ?? '',
     role: survey?.role ?? '보조',
     scope: survey?.scope ?? '공통',
+    kind: survey?.kind ?? '임상',
     cutoff: survey?.cutoff ?? '',
     summary: survey?.summary ?? '',
     guide: survey?.guide ?? '',
@@ -212,6 +213,24 @@ const removeQuestion = (i) => draft.value.questions.splice(i, 1)
           </div>
 
           <div class="flex gap-2">
+            <!-- 종류. 인문 척도는 임상 원본의 코드에 H-를 붙인 것이다(4.7절) -->
+            <div class="flex min-w-0 flex-1 flex-col gap-1">
+              <span class="text-count text-text-secondary">종류</span>
+              <div class="flex h-11 items-center gap-1 rounded-lg bg-surface-field p-1">
+                <button
+                  v-for="kind in SURVEY_KINDS"
+                  :key="kind"
+                  class="flex h-9 flex-1 items-center justify-center rounded px-2 text-label font-medium"
+                  :class="draft.kind === kind
+                    ? 'bg-surface-card text-text-primary'
+                    : 'text-text-secondary active:bg-surface-pressed'"
+                  @click="draft.kind = kind"
+                >
+                  {{ kind }}
+                </button>
+              </div>
+            </div>
+
             <div class="flex min-w-0 flex-1 flex-col gap-1">
               <span class="text-count text-text-secondary">역할</span>
               <div class="flex h-11 items-center gap-1 rounded-lg bg-surface-field p-1">
