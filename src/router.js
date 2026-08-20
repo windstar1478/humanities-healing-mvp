@@ -6,6 +6,7 @@ import { findGroup } from './mocks/dataFields.js'
 import { findProcess } from './mocks/processLibrary.js'
 import { findProgram } from './mocks/programs.js'
 import { findActivity } from './mocks/activities.js'
+import { findBook } from './mocks/books.js'
 import { findSpec } from './mocks/dataSpecs.js'
 
 /*
@@ -153,6 +154,18 @@ const router = createRouter({
         to.params.id === 'new' || findActivity(to.params.id)
           ? true
           : { path: '/authoring/activity', replace: true },
+    },
+    /*
+     * 도서 콘텐츠 저작. 한 건 = 한 도서에서 뽑은 문단 하나다.
+     */
+    {
+      path: '/authoring/book/:id',
+      component: () => import('./views/BookEditorView.vue'),
+      meta: { noPatientPanel: true },
+      beforeEnter: (to) =>
+        to.params.id === 'new' || findBook(to.params.id)
+          ? true
+          : { path: '/authoring/book', replace: true },
     },
     /*
      * 저작도구 하나. 어느 도구인지가 경로에 들어간다 —

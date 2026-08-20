@@ -6,6 +6,7 @@ import { processLibrary } from './processLibrary.js'
 import { programs } from './programs.js'
 import { fieldGroups } from './dataFields.js'
 import { activities, activityMeta } from './activities.js'
+import { books, bookMeta } from './books.js'
 import { dataSpecs, categoryOf, fieldsOf } from './dataSpecs.js'
 
 /*
@@ -167,8 +168,9 @@ export const authoringTools = [
       '등록 단위가 문장이 아니라 도서다 — 구버전 화면도 자기 버튼에 ' +
       "'새로운 도서 콘텐츠 등록'이라고 적고 있다. 문장은 등록한 도서에서 " +
       '이후에 뽑히는 것이라 등록하는 것과 단위가 다르다.',
-    items: () => null,
+    items: () => books.map((b) => ROW(b.id, b.title, bookMeta(b))),
     itemLabel: '도서',
+    editPath: (id) => `/authoring/book/${id ?? 'new'}`,
   },
 ]
 
