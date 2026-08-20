@@ -1,7 +1,11 @@
+import {
+  ListChecks, Database, ClipboardList, Workflow, LayoutGrid, Activity, BookOpen,
+} from 'lucide-vue-next'
 import { surveys } from './surveys.js'
 import { processLibrary } from './processLibrary.js'
 import { programs } from './programs.js'
 import { fieldGroups } from './dataFields.js'
+import { activities, activityMeta } from './activities.js'
 import { dataSpecs, categoryOf, fieldsOf } from './dataSpecs.js'
 
 /*
@@ -42,6 +46,7 @@ const ROW = (id, title, meta, badge = null) => ({ id, title, meta, badge })
 export const authoringTools = [
   {
     key: 'scale',
+    icon: ListChecks,
     group: '데이터',
     name: '척도',
     legacy: '감정평가',
@@ -66,6 +71,7 @@ export const authoringTools = [
   },
   {
     key: 'field',
+    icon: Database,
     group: '데이터',
     name: '데이터 필드',
     legacy: null,
@@ -85,6 +91,7 @@ export const authoringTools = [
   },
   {
     key: 'spec',
+    icon: ClipboardList,
     group: '데이터',
     name: '데이터 명세',
     legacy: null,
@@ -99,6 +106,7 @@ export const authoringTools = [
   },
   {
     key: 'process',
+    icon: Workflow,
     group: '데이터',
     name: '프로세스',
     legacy: '프로세스 명세',
@@ -116,6 +124,7 @@ export const authoringTools = [
   },
   {
     key: 'program',
+    icon: LayoutGrid,
     group: '프로그램',
     name: '프로그램',
     legacy: '프로그램 저작',
@@ -126,25 +135,30 @@ export const authoringTools = [
         ROW(p.id, p.name, [p.condition, `${p.sessions.length}세션`, `${p.minutes}분`, p.org]),
       ),
     itemLabel: '프로그램',
+    editPath: (id) => `/authoring/program/${id ?? 'new'}`,
   },
   {
     key: 'activity',
+    icon: Activity,
     group: '프로그램',
     name: '세션 활동',
     legacy: '세션활동 저작',
     summary: '프로그램을 구성하는 회차의 활동을 만든다',
     rename: SUFFIX_ONLY,
     /*
-     * ⚠️ 활동 정의 목업이 아직 없다. `programs.js`의 세션 이름을 모아 보여주는
-     *    안을 만들었다가 걷었다 — 이름만 있고 내용이 없는 목록이 **정의가 있는
-     *    것처럼** 읽힌다. 활동 구조가 확정되면 세션 활동도 자기 목업을 갖고
-     *    프로그램이 그것을 참조하게 된다.
+     * 활동 정의는 `activities.js`가 들고 있다. 한때 `programs.js`의 세션 이름을
+     * 모아 보여줬다가 걷었는데(이름만 있고 내용이 없는 목록은 정의가 있는 것처럼
+     * 읽힌다) 이제 자기 목업이 생겼다. **프로그램이 이것을 가져다 놓는 관계**는
+     * 아직 붙지 않았다 — 설계문서 6.2절 42번.
      */
-    items: () => null,
+    items: () =>
+      activities.map((a) => ROW(a.id, a.name, activityMeta(a), a.done ? null : '작성 중')),
     itemLabel: '활동',
+    editPath: (id) => `/authoring/activity/${id ?? 'new'}`,
   },
   {
     key: 'book',
+    icon: BookOpen,
     group: '프로그램',
     name: '도서 콘텐츠',
     legacy: '문장 명세',

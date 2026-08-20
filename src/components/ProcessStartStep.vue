@@ -53,8 +53,8 @@ function onClose(process) {
   props.patient.processId = process.id
   props.patient.processName = process.name
   props.patient.process = '진행 중'
-  props.patient.status = '감정평가 (사전)'
-  props.patient.nextStep = '프로그램 처방'
+  /* 첫 노드로 옮긴다. 어떤 종류인지는 붙인 정의가 정하므로 이름을 적지 않는다 */
+  props.patient.stepIndex = 1
   emit('assign', process)
 }
 </script>

@@ -8,6 +8,7 @@ import {
 } from 'lucide-vue-next'
 import { recentPatients, allPatients } from './mocks/patients.js'
 import { dimensions } from './mocks/analysis.js'
+import { statusOf } from './mocks/process.js'
 import { visitsOf } from './scheduleState.js'
 import {
   dragState, startPress, trackPress, trackDrag, endPress, cancelDrag, clearRejected,
@@ -144,7 +145,7 @@ const sortedPatients = computed(() => {
   }
   if (patientSort.value === 'stage') {
     return list.sort((a, b) =>
-      STAGE_ORDER.indexOf(a.status) - STAGE_ORDER.indexOf(b.status) || byName(a, b))
+      STAGE_ORDER.indexOf(statusOf(a)) - STAGE_ORDER.indexOf(statusOf(b)) || byName(a, b))
   }
   /* 진료가 없는 사람은 뒤로 보낸다 — 최근이라 할 것이 없다. 리스트 화면과 같은 규칙 */
   return list
@@ -177,7 +178,7 @@ const searching = computed(() => patientQuery.value.trim().length > 0)
 const searchResults = computed(() => {
   const q = patientQuery.value.trim()
   return sortedPatients.value.filter(
-    (p) => p.name.includes(q) || p.condition.includes(q) || p.status.includes(q),
+    (p) => p.name.includes(q) || p.condition.includes(q) || statusOf(p).includes(q),
   )
 })
 
@@ -420,7 +421,7 @@ onUnmounted(() => {
               <span class="truncate text-title-sm font-semibold"
                 >{{ p.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ p.age }}·{{ p.sex }}</span></span>
               <span class="truncate text-label font-medium"
-                >{{ p.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ p.status }}</span></span>
+                >{{ p.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ statusOf(p) }}</span></span>
             </span>
           </button>
 
@@ -477,7 +478,7 @@ onUnmounted(() => {
               <span class="truncate text-title-sm font-semibold"
                 >{{ dragState.item.name }}<span class="text-caption font-normal text-text-secondary">&nbsp;{{ dragState.item.age }}·{{ dragState.item.sex }}</span></span>
               <span class="truncate text-label font-medium"
-                >{{ dragState.item.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ dragState.item.status }}</span></span>
+                >{{ dragState.item.condition }}<span class="text-caption font-normal text-text-secondary">&nbsp;&nbsp;{{ statusOf(dragState.item) }}</span></span>
             </span>
           </template>
           <span v-else class="flex min-w-0 flex-1 flex-col gap-0.5 px-2">

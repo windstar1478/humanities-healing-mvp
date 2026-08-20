@@ -4,6 +4,8 @@ import { findTool } from './mocks/authoring.js'
 import { surveys } from './mocks/surveys.js'
 import { findGroup } from './mocks/dataFields.js'
 import { findProcess } from './mocks/processLibrary.js'
+import { findProgram } from './mocks/programs.js'
+import { findActivity } from './mocks/activities.js'
 import { findSpec } from './mocks/dataSpecs.js'
 
 /*
@@ -126,6 +128,31 @@ const router = createRouter({
         to.params.id === 'new' || findProcess(to.params.id)
           ? true
           : { path: '/authoring/process', replace: true },
+    },
+    /*
+     * 프로그램 저작. 회차의 이름과 순서까지가 이 화면의 몫이고
+     * 회차 안의 활동은 세션 활동이 맡는다.
+     */
+    {
+      path: '/authoring/program/:id',
+      component: () => import('./views/ProgramEditorView.vue'),
+      meta: { noPatientPanel: true },
+      beforeEnter: (to) =>
+        to.params.id === 'new' || findProgram(to.params.id)
+          ? true
+          : { path: '/authoring/program', replace: true },
+    },
+    /*
+     * 세션 활동 저작. 좌 메타데이터 · 우 블록 구성 두 판이다.
+     */
+    {
+      path: '/authoring/activity/:id',
+      component: () => import('./views/ActivityEditorView.vue'),
+      meta: { noPatientPanel: true },
+      beforeEnter: (to) =>
+        to.params.id === 'new' || findActivity(to.params.id)
+          ? true
+          : { path: '/authoring/activity', replace: true },
     },
     /*
      * 저작도구 하나. 어느 도구인지가 경로에 들어간다 —

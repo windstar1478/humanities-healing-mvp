@@ -107,7 +107,7 @@ const surveyChoices = computed(() =>
  */
 const programChoices = computed(() => {
   const list = [...programs.filter((p) => p.condition === draft.value.condition)]
-    .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name, 'ko'))
+    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.name.localeCompare(b.name, 'ko'))
   /* 추천은 **하나뿐**이다. 절반에 배지가 붙으면 추천이 아니라 분류가 된다 */
   return list.map((p, i) => ({ ...p, recommended: i === 0 }))
 })

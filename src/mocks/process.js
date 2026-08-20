@@ -39,9 +39,8 @@ function nodeOf(step) {
 /*
  * 이 환자의 단계 목록. 스테퍼도 단계 본문도 라우팅도 전부 이것을 센다.
  *
- * ⚠️ 같은 종류의 노드가 둘 이상이면 status 문자열이 겹친다(수행 노드 두 개).
- *    지금은 앞의 것을 현재 단계로 본다 — 환자 레코드가 단계 번호를 들고 오면
- *    문자열 대조 자체가 없어진다.
+ * 같은 종류의 노드가 둘 이상이어도 갈리지 않는다 — 현재 단계는 환자 레코드의
+ * `stepIndex`가 정하고, status 문자열은 표시용으로만 쓴다.
  */
 export function stepsOf(patient) {
   const definition = patient ? processFor(patient) : null
@@ -52,13 +51,45 @@ export function stepsOf(patient) {
 export const statusOfStep = (patient, index) => stepsOf(patient)[index]?.status ?? null
 
 /* 명단에만 있고 단계 이름과 다른 status. 아직 프로세스를 붙이기 전이다 */
-const BEFORE_START = ['접수 완료']
+const BEFORE_START = '접수 완료'
 
+/*
+ * **현재 단계는 환자 레코드의 `stepIndex`가 원본이다.**
+ *
+ * 예전에는 `patient.status` 문자열을 단계 이름과 대조해 번호를 찾았다.
+ * 그러면 같은 종류의 노드가 둘인 정의(처방 → 수행 → 처방 → 수행)에서 문자열이
+ * 겹쳐 **언제나 앞의 것이 잡히고 뒤 노드에는 도달할 수 없었다.**
+ * 번호를 레코드가 들고 있으면 대조 자체가 없어진다.
+ *
+ * 정의를 갈아끼워 단계 수가 줄면 저장된 번호가 범위를 넘을 수 있어 가둔다 —
+ * 없는 단계를 가리키면 스테퍼가 아무 노드도 현재로 칠하지 못한다.
+ */
 export function stepIndexOf(patient) {
   if (!patient) return 0
-  if (BEFORE_START.includes(patient.status)) return 0
-  const at = stepsOf(patient).findIndex((step) => step.status === patient.status)
-  return at >= 0 ? at : 0
+  const last = stepsOf(patient).length - 1
+  return Math.min(Math.max(patient.stepIndex ?? 0, 0), last)
+}
+
+/*
+ * 화면에 보이는 단계 이름. **표시용이고 원본이 아니다** —
+ * 우측 패널 · 리스트 · 분석 축 · 진행 문구가 모두 이것을 읽는다.
+ *
+ * 프로세스가 아직 붙지 않은 환자(시작 전)는 단계가 아니라 접수 상태다.
+ * 0단계를 그대로 보이면 이미 시작한 것으로 읽힌다.
+ */
+export function statusOf(patient) {
+  if (!patient) return ''
+  if (patient.process === '시작 전') return BEFORE_START
+  return stepsOf(patient)[stepIndexOf(patient)]?.status ?? BEFORE_START
+}
+
+/*
+ * 다음에 할 단계. 완료·중단 환자에게는 없다 —
+ * 끝났거나 끊긴 프로세스에 '다음'을 적으면 아직 갈 곳이 있는 것으로 읽힌다.
+ */
+export function nextStepOf(patient) {
+  if (!patient || patient.process !== '진행 중') return null
+  return statusOfStep(patient, stepIndexOf(patient) + 1)
 }
 
 /*
@@ -176,8 +207,8 @@ export function completeProcess(patient, stamp = null) {
     date: todayDot(),
     at: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
   }
-  patient.status = '프로세스 종료'
-  patient.nextStep = null
+  /* 마지막 단계(프로세스 종료)로 옮긴다. 단계 수는 정의마다 다르므로 센다 */
+  patient.stepIndex = stepsOf(patient).length - 1
   patient.process = '완료'
 }
 

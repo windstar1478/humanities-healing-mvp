@@ -1,3 +1,5 @@
+import { reactive } from 'vue'
+
 /*
  * 인문 프로그램 라이브러리 mock (Figma 178:3788 · 179:4283 · 180:4914).
  *
@@ -76,13 +78,13 @@ export function phasesOf(program, sessionIndex) {
 
 const P = (id, name, condition, spec) => ({ id, name, condition, ...spec })
 
-export const programs = [
+export const programs = reactive([
   P('pg-1', '문학 기반 외상 서사 재구성', 'PTSD', {
     rating: 4.6,
     field: '문학치료',
     form: '그룹',
     org: '중앙대학교병원',
-    orgPlace: '중앙대학교병원 · 서울',
+    place: '서울',
     emotions: ['불안', '분노', '무력감'],
     topics: ['서사', '외상'],
     supplies: ['감정 기록지', '필기구', '워크북'],
@@ -95,7 +97,7 @@ export const programs = [
     field: '시치료',
     form: '그룹',
     org: '한국문학치료학회',
-    orgPlace: '한국문학치료학회 · 서울',
+    place: '서울',
     emotions: ['불안', '우울'],
     topics: ['정서조절', '시'],
     supplies: ['시 선집', '필기구'],
@@ -108,7 +110,7 @@ export const programs = [
     field: '명상',
     form: '개인',
     org: '중앙대학교병원',
-    orgPlace: '중앙대학교병원 · 서울',
+    place: '서울',
     emotions: ['불안', '감정', '스트레스'],
     topics: ['이완', '애착'],
     supplies: ['색연필', '감정 기록지', '필기구', '스케치북', '아크릴 물감'],
@@ -121,7 +123,7 @@ export const programs = [
     field: '서사치료',
     form: '개인',
     org: '중앙대학교병원',
-    orgPlace: '중앙대학교병원 · 서울',
+    place: '서울',
     emotions: ['상실감', '무력감'],
     topics: ['생애사', '서사'],
     supplies: ['사진', '필기구', '스크랩북'],
@@ -134,7 +136,7 @@ export const programs = [
     field: '인지행동',
     form: '개인',
     org: '중앙대학교병원',
-    orgPlace: '중앙대학교병원 · 서울',
+    place: '서울',
     emotions: ['충동', '불안'],
     topics: ['습관', '자기조절'],
     supplies: ['사용 기록지', '필기구'],
@@ -147,7 +149,7 @@ export const programs = [
     field: '철학상담',
     form: '그룹',
     org: '한국철학상담치료학회',
-    orgPlace: '한국철학상담치료학회 · 서울',
+    place: '서울',
     emotions: ['공허', '무력감'],
     topics: ['자기이해', '대화'],
     supplies: ['토론 카드', '필기구'],
@@ -155,7 +157,7 @@ export const programs = [
     minutes: 90,
     sessions: ['오리엔테이션', '나는 무엇에 몰입하는가', '즐거움과 중독', '시간이라는 것', '관계의 자리', '나를 설명하는 말', '다시 고르기', '마무리'],
   }),
-]
+])
 
 /*
  * 필터 축. Figma에 열린 상태가 없어 선택지 구성은 초안이다.
@@ -170,7 +172,7 @@ export const PROGRAM_FILTERS = [
 ]
 
 export const PROGRAM_SORTS = [
-  { key: 'recommend', label: '추천순', compare: (a, b) => b.rating - a.rating },
+  { key: 'recommend', label: '추천순', compare: (a, b) => (b.rating ?? -1) - (a.rating ?? -1) },
   { key: 'session', label: '세션 적은순', compare: (a, b) => a.sessions.length - b.sessions.length },
   { key: 'name', label: '이름순', compare: (a, b) => a.name.localeCompare(b.name, 'ko') },
 ]
@@ -184,7 +186,7 @@ export const matchesFilter = (program, id, value) => {
 
 /* 행에 한 줄로 붙는 요약. 목록과 '선택됨' 문구가 같은 문법을 쓴다 */
 export const programMeta = (p) =>
-  `효과성 ${p.rating} · ${p.sessions.length}세션 · ${p.field} · ${p.form} · ${p.org}`
+  `효과성 ${p.rating ?? '-'} · ${p.sessions.length}세션 · ${p.field} · ${p.form} · ${p.org}`
 
 export function findProgram(id) {
   return programs.find((p) => p.id === id) ?? null
@@ -203,3 +205,50 @@ export const emotionAxes = [
   { id: 'safety', label: '관계 안전', value: 45 },
   { id: 'resilience', label: '회복탄력성', value: 55 },
 ]
+
+/*
+ * 프로그램 저작(저작도구)의 저장. 편집 화면은 `views/ProgramEditorView.vue`다.
+ *
+ * **회차의 이름과 순서까지가 이 화면의 몫이다.** 회차 안의 PHASE와 활동은
+ * 세션 활동 저작이 만들고(4.8절), 지금은 `phasesOf`가 골격으로 채운다 —
+ * 두 자리에서 같은 것을 만들면 어느 쪽이 원본인지 알 수 없다.
+ *
+ * **효과성(`rating`)은 받지 않는다.** 수행 기록에서 나오는 값이지 만드는 사람이
+ * 정하는 값이 아니다. 새 프로그램은 아직 잴 것이 없어 `null`이고 화면이 `-`로
+ * 그린다 — 0으로 두면 '효과가 없다'는 측정 결과로 읽힌다.
+ */
+export function saveProgram(draft) {
+  const list = (text) =>
+    text.split(',').map((item) => item.trim()).filter(Boolean)
+
+  const found = findProgram(draft.id)
+  const next = {
+    id: draft.id,
+    name: draft.name.trim(),
+    condition: draft.condition,
+    /* 저작이 정하지 않는 값이라 원본을 그대로 옮긴다 */
+    rating: found?.rating ?? null,
+    field: draft.field.trim(),
+    form: draft.form,
+    org: draft.org.trim(),
+    place: draft.place.trim(),
+    emotions: list(draft.emotions),
+    topics: list(draft.topics),
+    supplies: list(draft.supplies),
+    summary: draft.summary.trim(),
+    minutes: Number(draft.minutes) || 0,
+    /* 빈 줄은 회차가 아니다. 이름 없는 회차를 남기면 목록에 빈 행이 선다 */
+    sessions: draft.sessions.map((name) => name.trim()).filter(Boolean),
+  }
+
+  const at = programs.findIndex((p) => p.id === next.id)
+  if (at >= 0) programs[at] = next
+  else programs.unshift(next)
+  return next
+}
+
+/* 새 프로그램의 id. 목록 안에서만 유일하면 된다 */
+export const nextProgramId = () => `pg-${programs.length + 1}-${Date.now().toString(36)}`
+
+/* 운영형태. 목록에서 세지 않고 고정한다 — 새로 만들 때 고를 값이 필요하다 */
+export const PROGRAM_FORMS = ['개인', '그룹']

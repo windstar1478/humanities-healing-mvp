@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { BIO_FIELDS } from './bioSignals.js'
+import { surveys } from './surveys.js'
 
 /*
  * 데이터 필드 정의 (웹 구버전 저작도구 이식).
@@ -16,7 +17,11 @@ import { BIO_FIELDS } from './bioSignals.js'
  *    단위·유형은 화면에서 확인할 수 있는 첫 항목 외에는 임의로 채웠다.
  *    생체신호 두 그룹은 `bioSignals.js`에서 가져온다 — 같은 항목을 두 곳에
  *    적으면 측정 화면과 저작도구가 다른 항목을 말하게 된다.
- *    감정평가 그룹은 무엇이 필드가 되는지 확인되지 않아 두지 않았다.
+ *    감정평가 그룹(EA)은 **설문 코드별 총점을 필드로 본 것**이다. 응답 한 줄 한 줄이
+ *    아니라 총점이 필드가 되는 이유는 앱이 읽는 값이 그것이기 때문이다 —
+ *    처방의 등급 판정도, 종료 화면의 사전·사후 비교도 총점 하나만 본다.
+ *    문항 단위로 필드를 만들면 척도를 고칠 때마다 그룹의 필드 수가 흔들린다.
+ *    ⚠️ 임의로 정한 단위다. 수집 단위가 확정되면 여기만 바꾼다.
  */
 
 /* UI 유형. 구버전 JSON의 `uiOption.type`이 그대로 값이다 */
@@ -35,6 +40,18 @@ const F = (name, type = 'text', unit = '', values = []) => ({ name, type, unit, 
 
 /* 생체신호는 측정 화면과 같은 항목을 쓴다. 단위도 거기서 온다 */
 const fromBio = (kind) => BIO_FIELDS[kind].map((f) => F(f.label, 'number', f.unit))
+
+/*
+ * 감정평가 그룹의 필드. **척도 목록에서 만든다** —
+ * 설문 코드를 여기 다시 적으면 척도 저작에서 척도를 늘렸을 때 그룹만 낡는다.
+ * 앞의 둘은 어느 시점의 값인지를 남기는 자리다. 총점만 있고 시점이 없으면
+ * 사전·사후가 한 칸에 겹친다.
+ */
+const emotionFields = () => [
+  F('평가 시점', 'select', '', ['사전', '사후']),
+  F('평가일자', 'date'),
+  ...Object.values(surveys).map((survey) => F(`${survey.code} 총점`, 'number', '점')),
+]
 
 export const fieldGroups = reactive([
   {
@@ -57,6 +74,12 @@ export const fieldGroups = reactive([
       F('평생 병력', 'textarea'),
       F('복용약', 'textarea'),
     ],
+  },
+  {
+    id: 'EA',
+    name: '감정평가',
+    category: '감정평가',
+    fields: emotionFields(),
   },
   {
     id: 'HRV',

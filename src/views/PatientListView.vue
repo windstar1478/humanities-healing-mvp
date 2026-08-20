@@ -6,6 +6,7 @@ import {
 } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import { dimensions } from '../mocks/analysis.js'
+import { statusOf } from '../mocks/process.js'
 import { daysFrom } from '../mocks/schedule.js'
 import { visitsOf } from '../scheduleState.js'
 
@@ -247,7 +248,7 @@ function reset() {
 
           <span class="flex w-[197px] shrink-0 flex-col text-caption text-text-secondary">
             <span class="truncate">{{ row.patient.process }}</span>
-            <span class="truncate">{{ row.patient.status }}</span>
+            <span class="truncate">{{ statusOf(row.patient) }}</span>
           </span>
 
           <span class="w-[194px] shrink-0 truncate text-caption text-text-secondary">

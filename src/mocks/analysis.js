@@ -1,4 +1,5 @@
 import { ageBucket } from './patients.js'
+import { statusOf } from './process.js'
 
 /*
  * 환자 분석의 축 정의. 집계 숫자는 여기 없다 —
@@ -81,7 +82,7 @@ export const dimensions = [
       '감정평가 (사후)',
       '프로세스 종료',
     ],
-    value: (patient) => patient.status,
+    value: (patient) => statusOf(patient),
     chipLabel: (values) => values.join('·'),
     labelWidth: 60,
   },

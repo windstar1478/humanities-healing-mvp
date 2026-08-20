@@ -2,7 +2,7 @@ import { GENERAL, PROCESS } from './home.js'
 import { processFor } from './processLibrary.js'
 import { responseOf } from './surveys.js'
 import { programs, findProgram } from './programs.js'
-import { historyOf } from './process.js'
+import { historyOf, statusOf } from './process.js'
 import { progressOf } from './sessions.js'
 
 /*
@@ -58,10 +58,11 @@ export function sessionProgress(patient) {
  */
 export function progressOfPatient(patient) {
   if (!patient) return null
+  const status = statusOf(patient)
 
   if (patient.process === '시작 전') {
     return {
-      step: patient.status,
+      step: status,
       detail: '치유 프로세스 미배정',
       tone: 'warning',
       unassigned: true,
@@ -69,27 +70,27 @@ export function progressOfPatient(patient) {
   }
 
   if (patient.process === '중단') {
-    return { step: patient.status, detail: '프로세스 중단됨', tone: 'warning' }
+    return { step: status, detail: '프로세스 중단됨', tone: 'warning' }
   }
 
   if (patient.process === '완료') {
     return { step: '프로세스 종료', detail: '프로세스 완료', tone: 'neutral' }
   }
 
-  if (patient.status.startsWith('감정평가')) {
-    const phase = patient.status.includes('사후') ? 'post' : 'pre'
+  if (status.startsWith('감정평가')) {
+    const phase = status.includes('사후') ? 'post' : 'pre'
     const survey = surveyProgress(patient, phase)
     return {
-      step: patient.status,
+      step: status,
       detail: survey ? `설문 ${survey.total}개 중 ${survey.done}개 작성` : null,
       tone: 'neutral',
     }
   }
 
-  if (patient.status === '프로그램 수행') {
+  if (status === '프로그램 수행') {
     const run = sessionProgress(patient)
     return {
-      step: patient.status,
+      step: status,
       /* 다 끝냈으면 '몇 번째'가 없다. 없는 회차를 진행 중으로 쓰면 안 된다 */
       detail: !run ? null
         : run.done >= run.total
@@ -99,7 +100,7 @@ export function progressOfPatient(patient) {
     }
   }
 
-  return { step: patient.status, detail: null, tone: 'neutral' }
+  return { step: status, detail: null, tone: 'neutral' }
 }
 
 /*
@@ -115,10 +116,11 @@ export function progressOfPatient(patient) {
  */
 export function visitDetail(patient, type) {
   if (type !== PROCESS || !patient) return GENERAL
+  const status = statusOf(patient)
 
-  if (patient.status.startsWith('감정평가')) return patient.status
+  if (status.startsWith('감정평가')) return status
 
-  if (patient.status === '프로그램 수행') {
+  if (status === '프로그램 수행') {
     const run = sessionProgress(patient)
     if (!run) return PROCESS
     const at = Math.min(run.done + 1, run.total)

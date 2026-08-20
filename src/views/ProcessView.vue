@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Check, Play, User } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
-import { stepsOf, statusOfStep, stepIndexOf, stepStateOf, completeProcess } from '../mocks/process.js'
+import { stepsOf, stepIndexOf, stepStateOf, completeProcess } from '../mocks/process.js'
 import InlineCallout from '../components/InlineCallout.vue'
 import { josa } from '../text.js'
 import ProcessStartStep from '../components/ProcessStartStep.vue'
@@ -47,12 +47,11 @@ function stepState(index) {
 /*
  * 단계를 마치고 다음으로 넘어간다. 환자의 현재 단계·다음 단계가 함께 바뀐다 —
  * 스테퍼도 우측 패널도 같은 레코드를 보므로 여기 한 번만 고치면 된다.
- * 다음 단계 이름은 `statusOfStep`이 정한다. 화면이 따로 적으면 갈라진다.
+ * 번호만 옮긴다 — 단계 이름은 `statusOf`가 정의에서 읽어 만든다.
  */
 function advance() {
   const next = step.value + 1
-  patient.value.status = statusOfStep(patient.value, next) ?? patient.value.status
-  patient.value.nextStep = statusOfStep(patient.value, next + 1)
+  patient.value.stepIndex = next
   router.push({ path: `/process/${patient.value.id}/${next}` })
 }
 

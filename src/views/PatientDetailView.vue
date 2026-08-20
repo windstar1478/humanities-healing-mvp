@@ -7,7 +7,7 @@ import {
 } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import {
-  stepsOf, stepIndexOf, stepStateOf,
+  stepsOf, stepIndexOf, stepStateOf, statusOf,
   processHistory, historyOf, CURRENT_VERSION,
   keyMetricsOf, metricPoints, SCALE_SPAN, SCALE_STEPS,
 } from '../mocks/process.js'
@@ -239,7 +239,7 @@ const currentContext = computed(() => {
   if (isRunning.value && step === '프로그램 수행' && sessions.value) {
     return `${step} · ${Math.min(sessions.value.done + 1, sessions.value.total)}회차`
   }
-  return patient.value?.status ?? step
+  return patient.value ? statusOf(patient.value) : step
 })
 
 const today = () => {

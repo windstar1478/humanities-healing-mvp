@@ -1,10 +1,10 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import {
-  ChevronLeft, ChevronRight, ChevronDown, Plus, ArrowUpDown, Check,
+  ChevronLeft, ChevronRight, ChevronDown, Plus, ArrowUpDown, Check, Star,
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
-import { quickAuthoringItems } from '../mocks/home.js'
+import { favoriteTools } from '../mocks/favorites.js'
 import { findPatientByName } from '../mocks/patients.js'
 import { shiftedKey } from '../mocks/schedule.js'
 import {
@@ -18,6 +18,9 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
 import InlineCallout from '../components/InlineCallout.vue'
 
 const router = useRouter()
+
+/* 홈에 오르는 도구. 이름·아이콘은 저작도구 정의에서 읽는다 */
+const favorites = computed(() => favoriteTools())
 
 /* 아젠다가 보여주는 창: 오늘 기준 앞뒤 3일 */
 const dayKeys = [-3, -2, -1, 0, 1, 2, 3].map((offset) => shiftedKey(offset))
@@ -314,19 +317,35 @@ const rowPopoverStyle = computed(() => {
   <div class="flex flex-1 gap-2 py-3">
     <!-- ─────────── 좌측 컬럼 ─────────── -->
     <div class="flex w-[247px] shrink-0 flex-col gap-2.5">
-      <!-- 빠른 저작 -->
+      <!--
+        빠른 저작 — 저작도구에서 별표한 도구가 온다(mocks/favorites.js).
+        머리 전체가 저작도구로 가는 길이다. chevron이 이미 '더 있다'고 말하고
+        있어 눌리지 않으면 고장으로 읽힌다(우측 패널 '전체 환자'와 같은 문법).
+      -->
       <section class="shrink-0 rounded-lg border border-border-default bg-surface-card px-3 py-2">
-        <h2 class="text-title-sm font-semibold">빠른 저작</h2>
-        <div class="mt-2.5 grid grid-cols-2 gap-2.5">
+        <button
+          class="-mx-1 flex h-11 w-full items-center gap-1 rounded-lg px-1 text-left active:bg-surface-pressed"
+          @click="router.push({ path: '/authoring' })"
+        >
+          <h2 class="text-title-sm font-semibold">빠른 저작</h2>
+          <ChevronRight :size="16" class="shrink-0 text-text-secondary" />
+        </button>
+        <div v-if="favorites.length" class="mt-1 grid grid-cols-2 gap-2.5">
           <button
-            v-for="item in quickAuthoringItems"
-            :key="item.id"
+            v-for="tool in favorites"
+            :key="tool.key"
             class="flex h-15 flex-col items-center justify-center gap-1 rounded-lg border border-border-default p-2 text-label font-medium text-text-primary active:bg-surface-pressed"
+            @click="router.push({ path: `/authoring/${tool.key}` })"
           >
-            <component :is="item.icon" :size="24" class="shrink-0" />
-            <span>{{ item.label }}</span>
+            <component :is="tool.icon" :size="24" class="shrink-0" />
+            <span class="truncate">{{ tool.name }}</span>
           </button>
         </div>
+        <!-- 별표가 하나도 없을 때. 빈 칸을 남기지 않고 어디서 담는지 말한다 -->
+        <p v-else class="flex items-center gap-1 py-2 text-caption text-text-secondary">
+          <Star :size="12" class="shrink-0" />
+          저작도구에서 별표한 도구가 여기 모입니다
+        </p>
       </section>
 
       <!-- 작업 -->

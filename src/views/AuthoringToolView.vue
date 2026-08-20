@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Plus } from 'lucide-vue-next'
 import { findTool } from '../mocks/authoring.js'
+import FavoriteToggle from '../components/FavoriteToggle.vue'
 
 /*
  * 저작도구 하나의 화면.
@@ -19,8 +20,10 @@ import { findTool } from '../mocks/authoring.js'
  * 둘 다 만드는 사람의 사정이지 쓰는 사람의 일이 아니다 —
  * 근거는 설계문서 4.8절에만 남긴다.
  *
- * **편집 화면은 도구마다 하나씩 연다**(`editPath`). 지금은 척도 하나뿐이고,
- * 열리지 않은 도구는 만드는 조작을 비활성으로 둔다 — 있는 척하지 않는다.
+ * **편집 화면은 도구마다 하나씩 연다**(`editPath`). 세션 활동 · 도서 콘텐츠는
+ * 아직 열리지 않았고, 그런 도구는 만드는 조작을 비활성으로 둔다 — 있는 척하지 않는다.
+ *
+ * 머리 우측의 별표는 이 도구를 **홈의 '빠른 저작'**에 올린다(`mocks/favorites.js`).
  *
  * ⚠️ Figma 디자인이 미완성이라 이 화면 전체가 초안이다(4.8절).
  */
@@ -49,6 +52,8 @@ const back = () => router.push({ path: '/authoring' })
       </button>
       <h1 class="whitespace-nowrap text-title-sm font-semibold">{{ tool.name }}</h1>
       <p class="min-w-0 flex-1 truncate text-label text-text-secondary">{{ tool.summary }}</p>
+      <!-- 켜면 홈의 '빠른 저작'에 오른다 -->
+      <FavoriteToggle :tool="tool.key" class="-mr-2" />
     </section>
 
     <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">

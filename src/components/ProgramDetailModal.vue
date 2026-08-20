@@ -78,7 +78,7 @@ function settle() {
         <div class="flex items-center justify-center gap-4 border-b border-border-default p-4 text-center">
           <div class="flex flex-col items-center gap-0.5">
             <p class="text-label font-medium text-text-secondary">효과성</p>
-            <p class="text-title-lg font-semibold">{{ program.rating }}</p>
+            <p class="text-title-lg font-semibold">{{ program.rating ?? '-' }}</p>
           </div>
           <div class="flex flex-col items-center gap-0.5">
             <p class="text-label font-medium text-text-secondary">세션</p>
@@ -93,7 +93,7 @@ function settle() {
         <div class="flex flex-col gap-1 py-1">
           <div class="flex flex-col gap-0.5 px-3 py-1">
             <p class="text-label font-medium">운영 기관</p>
-            <p class="text-caption text-text-secondary">{{ program.orgPlace }}</p>
+            <p class="text-caption text-text-secondary">{{ program.org }} · {{ program.place }}</p>
           </div>
           <div class="flex flex-col gap-1 px-3 py-1">
             <p class="text-label font-medium">준비물</p>

@@ -1,14 +1,11 @@
-import { Database, ListChecks, Quote, Workflow } from 'lucide-vue-next'
-
-/* 홈(업무) 화면 mock 데이터. 작업 목록은 mocks/tasks.js에 있다 */
-
-/* 그리드는 행 우선(2열)이라 이 순서가 Figma의 열 배치와 일치한다 */
-export const quickAuthoringItems = [
-  { id: 'data-item', label: '데이터 항목', icon: Database },
-  { id: 'scale', label: '평가 척도', icon: ListChecks },
-  { id: 'excerpt', label: '발췌문', icon: Quote },
-  { id: 'process', label: '프로세스 설계', icon: Workflow },
-]
+/*
+ * 홈(업무) 화면 mock 데이터. 작업 목록은 mocks/tasks.js에 있다.
+ *
+ * **'빠른 저작' 칸은 여기 없다.** 예전에는 네 항목을 여기 고정 목록으로 들고
+ * 있었는데, 이름이 저작도구의 것과 갈라진 데다(데이터 항목 · 평가 척도 ·
+ * 발췌문 · 프로세스 설계) 눌러도 가는 곳이 없었다. 지금은 즐겨찾기가 그 자리를
+ * 채운다 — `mocks/favorites.js`가 원본이다.
+ */
 
 /*
  * 배치 유형. 단계는 표시하지 않는다 — 상담사와 환자가 대면하는 순간은
