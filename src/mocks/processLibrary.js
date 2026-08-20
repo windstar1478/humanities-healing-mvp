@@ -78,14 +78,14 @@ const P = (id, name, condition, author, date, summary, steps, deprecated = false
 const ptsdSteps = (total) => [
   EVAL('감정평가(사전)', PTSD_SURVEYS),
   STEP('프로그램 처방', '', PTSD_PROGRAMS),
-  STEP('프로그램 수행', `총 ${total}회기·${total}주·주 1회`, sessions(total)),
+  STEP('프로그램 수행', `총 ${total}회기`, sessions(total)),
   EVAL('감정평가(사후)', PTSD_SURVEYS),
 ]
 
 const gameSteps = (total) => [
   EVAL('감정평가(사전)', GAME_SURVEYS),
   STEP('프로그램 처방', '', GAME_PROGRAMS),
-  STEP('프로그램 수행', `총 ${total}회기·${total}주·주 1회`, sessions(total)),
+  STEP('프로그램 수행', `총 ${total}회기`, sessions(total)),
   EVAL('감정평가(사후)', GAME_SURVEYS),
 ]
 
@@ -179,19 +179,16 @@ export function processFor(patient) {
 /*
  * 프로세스 저작(저작도구)의 저장.
  *
- * **단계 골격은 받지 않는다.** 코어 프로세스가 이미 네 단계로 고정돼 있고
- * (감정평가 사전 → 프로그램 처방 → 프로그램 수행 → 감정평가 사후), 화면·스테퍼·
- * `stepStateOf`가 전부 그 순서를 전제한다. 구버전 웹처럼 노드를 자유롭게 이으면
- * **앱이 그릴 수 없는 정의**가 만들어진다. 저작이 정하는 것은 그 골격 안의
- * 내용물뿐이다 — 감정평가 설문 구성 · 처방 후보 프로그램 · 수행 회기 수.
+ * **단계 구성은 고정이 아니다.** 감정평가 · 프로그램 처방 · 프로그램 수행 노드를
+ * 몇 개든, 어떤 순서로든 이을 수 있다 — 구버전 웹이 노드 편집기로 설계된 이유가
+ * 그것이다. 표준형(사전 평가 → 처방 → 수행 → 사후 평가)은 흔한 한 가지일 뿐이다.
  *
- * 단계 메타(`설문 N종` · `총 N회기…`)도 여기서 만든다. 손으로 적게 하면
- * 구성과 갈라진다.
+ * 단계 메타(`설문 N종`)는 구성에서 만든다. 손으로 적게 하면 구성과 갈라진다.
+ *
+ * ⚠️ 코어 프로세스 화면은 아직 표준형 네 노드를 전제로 그린다. 노드 수가 다른
+ *    정의를 환자에게 붙이면 스테퍼가 그대로 따라가지 못한다(6.2절 38번).
  */
 export function saveProcess(draft) {
-  const evalItems = pick(draft.surveyCodes)
-  const total = Math.max(1, Number(draft.sessionCount) || 1)
-
   const next = {
     id: draft.id,
     name: draft.name.trim(),
@@ -199,12 +196,26 @@ export function saveProcess(draft) {
     author: draft.author.trim(),
     date: draft.date,
     summary: draft.summary.trim(),
-    steps: [
-      EVAL('감정평가(사전)', evalItems),
-      STEP('프로그램 처방', '', draft.programs.map((p) => ({ code: p.field, label: p.name }))),
-      STEP('프로그램 수행', `총 ${total}회기·${total}주·주 1회`, sessions(total)),
-      EVAL('감정평가(사후)', evalItems),
-    ],
+    steps: draft.nodes.map((node) => {
+      if (node.type === '감정평가') {
+        /*
+         * 시점이 정해지지 않은 노드는 이름에 아무것도 붙이지 않는다.
+         * 사전·사후를 읽는 화면들이 이름으로 찾기 때문에(`includes('사전')`)
+         * 임의로 붙이면 엉뚱한 노드가 사전으로 잡힌다.
+         */
+        const name = node.phase ? `감정평가(${node.phase})` : '감정평가'
+        return EVAL(name, pick(node.surveyCodes))
+      }
+      if (node.type === '프로그램 처방') {
+        return STEP('프로그램 처방', '', node.programs.map((p) => ({ code: p.field, label: p.name })))
+      }
+      /*
+       * **수행 노드는 회차를 적지 않는다.** 회차의 이름·개수는 처방된 프로그램이
+       * 정하고 날짜는 일정이 정한다(4.6.4절). 정의에 적어두면 세 곳이 같은 사실을
+       * 들고 있게 되고, 주기(`주 1회`)처럼 일정에 달린 값을 정의가 약속하게 된다.
+       */
+      return STEP('프로그램 수행', '', [])
+    }),
     deprecated: false,
     bio: draft.bio,
   }
