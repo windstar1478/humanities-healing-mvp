@@ -59,7 +59,7 @@ function settle() {
           </span>
         </template>
         <template v-else>
-          <h2 class="shrink-0 text-title-sm font-semibold">{{ session + 1 }}. {{ program.sessions[session] }}</h2>
+          <h2 class="shrink-0 text-title-sm font-semibold">{{ session + 1 }}. {{ program.sessions[session].name }}</h2>
           <span class="truncate text-caption text-text-secondary">{{ program.name }}</span>
         </template>
       </div>
@@ -124,13 +124,13 @@ function settle() {
 
         <div class="flex flex-col">
           <button
-            v-for="(name, i) in program.sessions"
+            v-for="(item, i) in program.sessions"
             :key="i"
             class="flex h-13 w-full items-center gap-2.5 border-b border-border-default p-1 text-left active:bg-surface-pressed"
             @click="openSession(i)"
           >
             <span class="w-4 shrink-0 text-center text-caption text-text-secondary">{{ i + 1 }}</span>
-            <span class="min-w-0 flex-1 truncate text-body">{{ name }}</span>
+            <span class="min-w-0 flex-1 truncate text-body">{{ item.name }}</span>
             <span class="flex size-11 shrink-0 items-center justify-center text-text-secondary">
               <ChevronRight :size="16" />
             </span>

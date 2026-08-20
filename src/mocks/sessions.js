@@ -70,8 +70,8 @@ function init(patient, program) {
     : step < 3 ? 0
       : 1 + (seed % Math.max(1, total - 1))
 
-  const entries = program.sessions.map((name, i) => ({
-    name,
+  const entries = program.sessions.map((session, i) => ({
+    name: session.name,
     date: null,
     done: i < current,
     note: i < current ? NOTES[(seed + i) % NOTES.length] : '',

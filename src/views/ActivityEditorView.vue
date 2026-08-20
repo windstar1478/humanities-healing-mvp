@@ -4,7 +4,7 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ChevronLeft, ChevronUp, ChevronDown, Plus, Trash2, Check } from 'lucide-vue-next'
 import {
   activities, findActivity, saveActivity, nextActivityId,
-  ACTIVITY_KINDS, allKinds, PHASE_TYPES, SUPPLY_CHOICES, DIFFICULTIES, BLOCK_KINDS,
+  ACTIVITY_KINDS, allKinds, PHASE_TYPES, DIFFICULTIES, BLOCK_KINDS,
 } from '../mocks/activities.js'
 import { dimensions } from '../mocks/analysis.js'
 import { josa } from '../text.js'
@@ -51,7 +51,7 @@ function draftFrom(activity) {
     difficulty: activity?.difficulty ?? DIFFICULTIES[0],
     recommended: activity?.recommended ?? 1,
     capacity: activity?.capacity ?? 1,
-    supplies: [...(activity?.supplies ?? [])],
+    supplies: (activity?.supplies ?? []).join(', '),
     goal: activity?.goal ?? '',
     note: activity?.note ?? '',
     done: activity?.done ?? false,
@@ -70,12 +70,6 @@ const isDirty = computed(() => JSON.stringify(draft.value) !== snapshot.value)
 const blockCount = computed(() =>
   draft.value.phases.reduce((n, phase) => n + phase.blocks.length, 0),
 )
-
-function toggleSupply(item) {
-  const at = draft.value.supplies.indexOf(item)
-  if (at >= 0) draft.value.supplies.splice(at, 1)
-  else draft.value.supplies.push(item)
-}
 
 /* 새 블록은 첫 종류로 시작한다. 고르지 않은 채로 두면 무엇을 하는 자리인지 비어 있다 */
 const newBlock = () => ({ kind: BLOCK_KINDS[0], activity: allKinds()[0], text: '' })
@@ -332,23 +326,15 @@ onBeforeRouteLeave((to, from) => {
           </label>
         </div>
 
-        <div class="flex shrink-0 flex-col gap-1">
-          <span class="text-count text-text-secondary">필요 도구</span>
-          <div class="flex flex-wrap gap-1">
-            <button
-              v-for="item in SUPPLY_CHOICES"
-              :key="item"
-              class="flex h-11 items-center gap-1 rounded-lg border px-3 text-label"
-              :class="draft.supplies.includes(item)
-                ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
-                : 'border-border-default text-text-secondary active:bg-surface-pressed'"
-              @click="toggleSupply(item)"
-            >
-              <Check v-if="draft.supplies.includes(item)" :size="12" class="shrink-0" />
-              {{ item }}
-            </button>
-          </div>
-        </div>
+        <!-- 프로그램의 준비물과 같은 자를 쓴다. 붙이면 세션 상세에 그대로 오른다 -->
+        <label class="flex shrink-0 flex-col gap-1">
+          <span class="text-count text-text-secondary">필요 도구 (쉼표로 구분)</span>
+          <input
+            v-model="draft.supplies"
+            class="h-11 w-full rounded-lg border border-border-default bg-surface-field px-3 text-label text-text-primary"
+            placeholder="예: 연필, 도화지, 포스트잇"
+          />
+        </label>
 
         <label class="flex shrink-0 flex-col gap-1">
           <span class="text-count text-text-secondary">활동 목표</span>

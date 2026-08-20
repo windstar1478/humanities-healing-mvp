@@ -6,10 +6,12 @@
  * 구버전 웹의 `작성 완료 (프로그램 세션에 배치 가능)` 체크가 두 층의 관계를
  * 말해 준다 — **프로그램의 세션이 활동을 가져다 놓는다.**
  *
- * ⚠️ 배치(프로그램 세션 ↔ 활동 연결)는 아직 붙이지 않았다. 프로그램의 세션이
- *    지금은 이름 문자열이라, 연결을 붙이려면 세션의 자료형부터 바꿔야 한다.
- *    그때까지 세션 상세는 `programs.js`의 `phasesOf`가 골격으로 채운다.
- *    6.2절 42번 항목 참조.
+ * 배치는 프로그램 저작의 회차 행에서 한다. 회차가 `activityId`를 들고, 세션
+ * 상세(`phasesOf`)가 붙은 활동의 치유단계를 그대로 읽는다 — 아직 붙지 않은
+ * 회차만 생성기가 골격으로 채운다.
+ *
+ * **`done`(작성 완료)이 배치의 자격이다.** 내용이 덜 채워진 활동이 회차에 붙으면
+ * 환자를 만나는 자리에 빈 안내문이 오른다.
  */
 
 import { reactive } from 'vue'
@@ -36,13 +38,11 @@ export const allKinds = () => ACTIVITY_KINDS.flatMap((g) => g.values)
 export const PHASE_TYPES = ['도입', '투사', '통찰', '통합', '마무리']
 
 /*
- * 필요 도구. 웹은 고정 체크박스 여덟이다.
- * ⚠️ 프로그램의 준비물은 자유 입력이라 두 목록이 갈린다(4.8.8절). 배치가 붙으면
- *    한 목록에서 와야 한다 — 6.2절 42번 항목 참조.
+ * 필요 도구는 **자유 입력이다.** 웹은 고정 체크박스 여덟(연필 · 물감 · 색연필 ·
+ * 도화지 · 가위 · 풀 · 노트 · 포스트잇)이지만, 프로그램의 준비물이 자유 입력이라
+ * 두 목록이 갈렸다 — 활동을 회차에 붙이면 그 준비물이 세션 상세에 그대로 오르므로
+ * 같은 자를 써야 한다. 고정 목록에 없는 물건(시 선집 · 워크북)을 적을 길도 생긴다.
  */
-export const SUPPLY_CHOICES = [
-  '연필', '물감', '색연필', '도화지', '가위', '풀', '노트', '포스트잇',
-]
 
 export const DIFFICULTIES = ['초급', '중급', '고급']
 
@@ -160,7 +160,7 @@ export function saveActivity(draft) {
     difficulty: draft.difficulty,
     recommended: Number(draft.recommended) || 0,
     capacity: Number(draft.capacity) || 0,
-    supplies: [...draft.supplies],
+    supplies: draft.supplies.split(',').map((item) => item.trim()).filter(Boolean),
     goal: draft.goal.trim(),
     note: draft.note.trim(),
     done: draft.done,

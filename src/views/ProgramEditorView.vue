@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-vue-ne
 import {
   programs, findProgram, saveProgram, nextProgramId, PROGRAM_FORMS,
 } from '../mocks/programs.js'
+import { activities, findActivity } from '../mocks/activities.js'
 import { dimensions } from '../mocks/analysis.js'
 import InlineCallout from '../components/InlineCallout.vue'
 import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
@@ -13,10 +14,14 @@ import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
 /*
  * 프로그램 저작 — 저작도구 '프로그램'의 편집 화면 (축소 버전). 편집 화면 5호.
  *
- * **회차의 이름과 순서까지가 이 화면의 몫이다.** 회차 안의 PHASE와 활동은
- * 세션 활동 저작이 만들 자리다(4.8절) — 두 화면이 같은 것을 만들면 어느 쪽이
- * 원본인지 알 수 없다. 그래서 여기서 회차는 **이름을 가진 자리**까지만이고,
- * 처방 화면의 세션 상세는 지금처럼 `phasesOf`가 골격으로 채운다.
+ * **회차의 이름과 순서, 그리고 무엇을 붙일지까지가 이 화면의 몫이다.**
+ * 회차 안의 치유단계·블록은 세션 활동 저작이 만들고(4.8.9절) 여기서는 **고른다** —
+ * 두 화면이 같은 것을 만들면 어느 쪽이 원본인지 알 수 없다. 데이터 명세가 필드를
+ * 만들지 않고 고르는 것과 같은 자리다(4.8.7절).
+ *
+ * **고를 수 있는 것은 `작성 완료`된, 같은 증상의 활동뿐이다.** 내용이 덜 채워진
+ * 활동이 붙으면 환자를 만나는 자리에 빈 안내문이 오르고, 증상이 다른 활동은
+ * 이 프로그램이 다루는 것과 어긋난다.
  *
  * **효과성(rating)은 받지 않는다.** 수행 기록에서 나오는 값이지 만드는 사람이
  * 적는 값이 아니다. 축소 기준은 척도 저작과 같다 — **앱이 실제로 읽는 필드**만
@@ -52,7 +57,7 @@ function draftFrom(program) {
     topics: line(program?.topics),
     supplies: line(program?.supplies),
     summary: program?.summary ?? '',
-    sessions: [...(program?.sessions ?? [])],
+    sessions: (program?.sessions ?? []).map((item) => ({ ...item })),
   }
 }
 
@@ -60,11 +65,34 @@ const draft = ref(draftFrom(original.value))
 const snapshot = ref(JSON.stringify(draft.value))
 const isDirty = computed(() => JSON.stringify(draft.value) !== snapshot.value)
 
+/*
+ * 붙일 수 있는 활동. **작성 완료된, 같은 증상의 것만** 오른다.
+ * 이미 붙어 있는데 조건에서 벗어난 활동은 목록에 남긴다 — 빠지면 무엇이 붙어
+ * 있었는지 화면에서 사라져 조용히 바뀐 것처럼 보인다.
+ */
+const activityChoices = computed(() => {
+  const picked = draft.value.sessions.map((item) => item.activityId).filter(Boolean)
+  return activities.filter(
+    (a) => (a.done && a.condition === draft.value.condition) || picked.includes(a.id),
+  )
+})
+
+const linkedCount = computed(() => draft.value.sessions.filter((item) => item.activityId).length)
+
+/* 증상을 바꾸면 그 증상에서 붙일 수 없는 활동은 떨어진다 — 프로세스 저작과 같다 */
+function pickCondition(condition) {
+  draft.value.condition = condition
+  for (const item of draft.value.sessions) {
+    const activity = findActivity(item.activityId)
+    if (activity && activity.condition !== condition) item.activityId = null
+  }
+}
+
 /* 새 회차는 추가하자마자 이름을 받는다 — 빈 줄을 남기지 않으려는 것이다 */
 const rows = ref([])
 
 async function addSession() {
-  draft.value.sessions.push('')
+  draft.value.sessions.push({ name: '', activityId: null })
   await nextTick()
   rows.value[draft.value.sessions.length - 1]?.focus()
 }
@@ -72,8 +100,8 @@ async function addSession() {
 function moveSession(i, step) {
   const to = i + step
   if (to < 0 || to >= draft.value.sessions.length) return
-  const [name] = draft.value.sessions.splice(i, 1)
-  draft.value.sessions.splice(to, 0, name)
+  const [session] = draft.value.sessions.splice(i, 1)
+  draft.value.sessions.splice(to, 0, session)
 }
 
 /*
@@ -83,11 +111,12 @@ function moveSession(i, step) {
 const deleting = ref(null)
 
 function askRemoveSession(i) {
-  if (!draft.value.sessions[i].trim()) {
+  const session = draft.value.sessions[i]
+  if (!session.name.trim() && !session.activityId) {
     draft.value.sessions.splice(i, 1)
     return
   }
-  deleting.value = { index: i, label: `${i + 1}회차 · ${draft.value.sessions[i]}` }
+  deleting.value = { index: i, label: `${i + 1}회차 · ${session.name || '이름 없음'}` }
 }
 
 function confirmRemoveSession() {
@@ -105,7 +134,7 @@ const blocked = computed(() => {
   if (!d.field.trim()) return '분야를 입력해 주세요'
   if (!d.org.trim()) return '기관을 입력해 주세요'
   if (!Number(d.minutes)) return '회차 분량을 입력해 주세요'
-  if (!d.sessions.some((name) => name.trim())) return '회차를 하나 이상 만들어 주세요'
+  if (!d.sessions.some((item) => item.name.trim())) return '회차를 하나 이상 만들어 주세요'
   return null
 })
 
@@ -225,7 +254,7 @@ onBeforeRouteLeave((to, from) => {
               :class="draft.condition === condition
                 ? 'bg-surface-card text-text-primary'
                 : 'text-text-secondary active:bg-surface-pressed'"
-              @click="draft.condition = condition"
+              @click="pickCondition(condition)"
             >
               {{ condition }}
             </button>
@@ -332,6 +361,7 @@ onBeforeRouteLeave((to, from) => {
           <p class="text-label font-medium">
             회차 <span class="text-text-secondary">· {{ draft.sessions.length }}</span>
           </p>
+          <span class="text-count text-text-secondary">활동 {{ linkedCount }}개 붙음</span>
           <span class="flex-1"></span>
           <button
             class="-mr-2 flex h-11 items-center gap-1 rounded-lg px-2 text-label text-text-secondary active:bg-surface-pressed"
@@ -343,22 +373,33 @@ onBeforeRouteLeave((to, from) => {
         </div>
 
         <p class="shrink-0 text-count text-text-secondary">
-          회차 안의 활동은 세션 활동에서 만든다. 여기서는 이름과 순서를 정한다
+          회차 안의 내용은 세션 활동에서 만든다. 여기서는 이름 · 순서 · 무엇을 붙일지를 정한다
         </p>
 
         <div class="mt-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           <div
-            v-for="(name, i) in draft.sessions"
+            v-for="(session, i) in draft.sessions"
             :key="i"
             class="flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-border-default px-3 py-1"
           >
             <span class="w-12 shrink-0 text-count text-text-secondary">{{ i + 1 }}회차</span>
             <input
               :ref="(el) => (rows[i] = el)"
-              v-model="draft.sessions[i]"
+              v-model="session.name"
               class="h-9 min-w-0 flex-1 rounded bg-transparent text-label text-text-primary"
               placeholder="회차 이름"
             />
+            <!-- 붙일 활동. 만들지 않고 고른다 — 원본은 세션 활동이다 -->
+            <select
+              v-model="session.activityId"
+              class="h-9 w-40 shrink-0 rounded-lg border border-border-default bg-surface-field px-2 text-count"
+              :class="session.activityId ? 'text-text-primary' : 'text-text-secondary'"
+            >
+              <option :value="null">활동 없음</option>
+              <option v-for="item in activityChoices" :key="item.id" :value="item.id">
+                {{ item.name }}
+              </option>
+            </select>
             <button
               v-for="move in [-1, 1]"
               :key="move"
