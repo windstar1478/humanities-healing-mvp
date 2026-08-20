@@ -6,7 +6,9 @@ import {
   books, findBook, saveBook, nextBookId,
   BOOK_ATTRIBUTES, BOOK_TYPES, ATTRIBUTE_TOTAL, countInAxis,
 } from '../mocks/books.js'
+import { citationsOf } from '../mocks/activities.js'
 import InlineCallout from '../components/InlineCallout.vue'
+import ModalShell from '../components/ModalShell.vue'
 import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
 
 /*
@@ -24,6 +26,11 @@ import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
  * **속성 분류는 화면이 들지 않는다**(`BOOK_ATTRIBUTES`). 45개 항목의 구성은
  * 백엔드·연구 방향에 따라 가장 먼저 바뀔 값이라, 화면은 배열을 그리기만 한다.
  * 축이 늘거나 항목이 바뀌면 목업 한 곳에서 끝난다.
+ *
+ * **문단을 고치면 그 문장을 가리키던 블록이 흔들린다.** 세션 활동의 `인문 문장`
+ * 블록이 문장 번호로 가리키므로(4.8.9절) 문장이 하나 늘거나 줄면 뒤쪽 번호가
+ * 밀린다. 번호가 범위를 넘는 경우는 읽는 화면이 알아채지만 밀린 경우는 조용히
+ * 바뀌므로 **저장하기 전에 알린다.** 막지는 않는다 — 고쳐야 할 오타일 수도 있다.
  *
  * ⚠️ Figma 디자인이 없다. 구버전 웹 화면의 구성만 옮긴 초안이다.
  */
@@ -91,11 +98,48 @@ function commit() {
   snapshot.value = JSON.stringify(draft.value)
 }
 
+/*
+ * 이 문단을 가리키는 블록. 문단을 고쳤을 때만 묻는다 —
+ * 속성값만 바꾼 저장까지 붙들면 경고가 값을 잃는다.
+ */
+const citations = computed(() => citationsOf(draft.value.id))
+const passageChanged = computed(
+  () => Boolean(original.value) && draft.value.passage.trim() !== original.value.passage,
+)
+
+const citeWarning = ref(false)
+
 function save() {
   if (blocked.value) {
     calloutOpen.value = true
     return
   }
+  if (passageChanged.value && citations.value.length) {
+    citeWarning.value = true
+    return
+  }
+  commit()
+  goList()
+}
+
+/*
+ * 어느 버튼이든 셸의 dismiss를 거쳐 닫고, 고른 것은 기억해 뒀다가 @close에서
+ * 처리한다(3.5절) — v-if로 그냥 걷으면 셸이 올려둔 history 엔트리가 남아
+ * 다음 뒤로가기를 소리 없이 삼킨다.
+ */
+let citeChoice = 'back'
+
+function pickCite(kind, dismiss) {
+  citeChoice = kind
+  dismiss()
+}
+
+function settleCite() {
+  const kind = citeChoice
+  citeChoice = 'back'
+  citeWarning.value = false
+  /* 돌아가기는 고치던 폼 그대로다. 중복 경고와 같은 문법 */
+  if (kind !== 'save') return
   commit()
   goList()
 }
@@ -320,6 +364,53 @@ onBeforeRouteLeave((to, from) => {
         </div>
       </section>
     </div>
+
+    <!--
+      문단을 고쳤고 그 문장을 가리키는 블록이 있을 때. 갈림길이라 스크림 탭으로
+      닫지 않는 alert이고, 되돌아갈 자리는 고치던 폼이다(중복 경고와 같은 문법).
+    -->
+    <ModalShell v-if="citeWarning" v-slot="{ dismiss }" name="cite" variant="alert" @close="settleCite">
+      <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-2 p-1">
+          <p class="text-title-sm font-semibold text-text-primary">
+            이 문단의 문장을 가리키는 블록이 있습니다
+          </p>
+          <p class="text-caption text-text-secondary">
+            문장이 늘거나 줄면 뒤쪽 번호가 밀려 다른 문장을 가리키게 됩니다.
+          </p>
+          <p class="text-caption text-text-primary">저장한 뒤 아래 블록을 다시 확인해 주세요.</p>
+        </div>
+
+        <div class="flex max-h-40 flex-col overflow-y-auto rounded-lg border border-border-default">
+          <div
+            v-for="(cite, i) in citations"
+            :key="i"
+            class="flex items-center gap-2 px-3 py-2"
+            :class="i > 0 && 'border-t border-border-subtle'"
+          >
+            <span class="min-w-0 flex-1 truncate text-label">{{ cite.activity }}</span>
+            <span class="shrink-0 text-count text-text-secondary">
+              {{ cite.phase }} · {{ cite.sentence + 1 }}번째 문장
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5">
+          <button
+            class="flex h-9 items-center justify-center rounded-lg border border-border-default px-3 py-2 text-body text-text-primary opacity-80 active:bg-surface-pressed"
+            @click="pickCite('back', dismiss)"
+          >
+            돌아가기
+          </button>
+          <button
+            class="flex h-9 items-center justify-center rounded-lg bg-surface-inverse px-3 py-2 text-body text-text-inverse active:bg-surface-inverse-pressed"
+            @click="pickCite('save', dismiss)"
+          >
+            그래도 저장
+          </button>
+        </div>
+      </div>
+    </ModalShell>
 
     <UnsavedWarningModal
       v-if="pendingAction"

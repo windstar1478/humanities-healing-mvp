@@ -49,6 +49,9 @@ export const DIFFICULTIES = ['초급', '중급', '고급']
 /*
  * 블록의 두 종류.
  *
+ * **안내문 본문은 여러 줄이 될 수 있다.** 줄 하나가 세션 상세의 절차 한 줄(a · b · c)이
+ * 된다 — 절차마다 블록을 나누면 같은 활동 종류가 여러 번 되풀이된다.
+ *
  * **안내문은 적고, 인문 문장은 고른다.** 인용하는 원문의 원본은 도서 콘텐츠이고
  * (4.8.10절) 블록은 **도서 id + 문장 번호**로 가리키기만 한다 — 문장을 여기
  * 옮겨 적으면 같은 문장이 자리마다 다시 적히고, 어느 책 몇 쪽에서 온 것인지도
@@ -113,6 +116,33 @@ export const activities = reactive([
       ]),
     ],
   }),
+  A('act-4', '프로그램 안내하기', {
+    summary: '프로그램의 취지와 전체 흐름을 안내한다',
+    condition: 'PTSD',
+    emotions: '불안, 감정, 스트레스',
+    minutes: 90,
+    difficulty: '초급',
+    recommended: 1,
+    capacity: 1,
+    supplies: ['감정 기록지', '필기구'],
+    goal: '프로그램의 목표를 함께 확인한다',
+    note: '',
+    done: true,
+    phases: [
+      /*
+       * 이 한 단계만 Figma 실측 문구다(마음챙김 1세션 PHASE 1).
+       * 예전에는 `programs.js`의 생성기가 이 문구를 들고 있었는데,
+       * **활동 정의가 생긴 뒤로는 여기가 그 자리다.**
+       */
+      PHASE('도입', '도입 (Introduction)', [
+        B('안내문', '경청하기', [
+          '인사를 나누고 프로그램의 취지를 안내한다.',
+          '6회기의 전체 프로그램을 비롯하여 애착유형을 통해 나의 관계방식을 점검하고 더 성숙한 관계를 형성하는 것을 목표로 함을 안내한다.',
+        ].join('\n')),
+        B('안내문', '낭독하기', '참여자들과 함께 이 프로그램 전체를 아우르는 문장을 낭독한다.'),
+      ]),
+    ],
+  }),
   A('act-3', '사용 시간 되짚기', {
     summary: '한 주의 사용 기록을 함께 살핀다',
     condition: '게임과몰입',
@@ -134,6 +164,29 @@ export const activities = reactive([
 ])
 
 export const findActivity = (id) => activities.find((a) => a.id === id) ?? null
+
+/*
+ * 이 도서의 문장을 가리키고 있는 블록들.
+ *
+ * 도서의 문단을 고치면 **뒤쪽 문장의 번호가 밀려** 그것을 가리키던 블록이 다른
+ * 문장을 말하게 된다. 번호가 범위를 넘는 경우는 읽는 화면이 알아채지만
+ * (`가리킨 문장을 찾을 수 없습니다`) 밀린 경우는 조용히 바뀌므로,
+ * **고치는 자리에서 미리 알린다.** 막지는 않는다 — 고쳐야 할 오타일 수도 있다.
+ */
+export function citationsOf(bookId) {
+  if (!bookId) return []
+  return activities.flatMap((activity) =>
+    activity.phases.flatMap((phase) =>
+      phase.blocks
+        .filter((block) => block.kind === '인문 문장' && block.bookId === bookId)
+        .map((block) => ({
+          activity: activity.name,
+          phase: phase.title || phase.type,
+          sentence: block.sentence,
+        })),
+    ),
+  )
+}
 
 /* 목록 한 줄에 붙는 요약. 저작도구 목록과 다른 화면이 같은 문법을 쓴다 */
 export const activityMeta = (a) => [

@@ -9,63 +9,13 @@ import { sentenceAt } from './books.js'
  * 치유 프로세스 정의(`processLibrary.js`)와는 다른 층이다 — 프로세스는 단계의
  * 뼈대이고, 여기 있는 것은 그 안의 '프로그램 수행' 단계에 들어갈 내용물이다.
  *
- * ⚠️ **세션·PHASE의 내용은 임의로 지은 목업이다.** Figma에 실제로 적힌 것은
- *    프로그램 4건의 요약 행과 '마음챙김 호흡 이완 훈련'의 세션 6개 이름,
- *    그리고 1세션 PHASE 1의 활동 문구뿐이다. 나머지는 패턴을 따라 채웠다.
+ * **회차 안의 내용은 여기 없다.** 회차는 이름과 붙인 활동만 들고, PHASE와 활동
+ * 문구는 세션 활동(`activities.js`)이 원본이다. Figma에 문구가 있던 한 단계
+ * (마음챙김 1세션 PHASE 1)도 활동 정의로 옮겼다(`act-4`).
+ *
+ * ⚠️ Figma에 실제로 적힌 것은 프로그램 4건의 요약 행과 '마음챙김 호흡 이완 훈련'의
+ *    세션 6개 이름뿐이다. 나머지 세션 이름은 패턴을 따라 채웠다.
  */
-
-/* PHASE는 세션마다 다섯이다. 이름은 Figma의 'PHASE 1 도입 (Introduction)'을 따랐다 */
-const PHASE_NAMES = [
-  '도입 (Introduction)',
-  '전개 (Development)',
-  '심화 (Deepening)',
-  '정리 (Consolidation)',
-  '마무리 (Closing)',
-]
-
-/*
- * Figma에 문구가 있는 것은 마음챙김 1세션 PHASE 1 하나뿐이다.
- * 나머지는 아래 생성기가 같은 골격으로 채운다 — 임의값임을 숨기지 않으려고
- * 문장을 그럴듯하게 늘리지 않았다.
- */
-const FIGMA_PHASE = {
-  place: '상담실',
-  people: 1,
-  emotions: '불안, 감정, 스트레스',
-  supplies: ['감정 기록지', '필기구'],
-  caution: '없음',
-  staff: '임상심리사 1인',
-  activities: [
-    {
-      title: '프로그램 안내하기',
-      steps: [
-        '인사를 나누고 프로그램의 취지를 안내한다.',
-        '6회기의 전체 프로그램을 비롯하여 애착유형을 통해 나의 관계방식을 점검하고 더 성숙한 관계를 형성하는 것을 목표로 함을 안내한다.',
-        '참여자들과 함께 이 프로그램 전체를 아우르는 문장을 낭독한다.',
-      ],
-    },
-  ],
-}
-
-const phaseFor = (program, session, index) => ({
-  name: PHASE_NAMES[index],
-  place: program.form === '그룹' ? '집단상담실' : '상담실',
-  people: program.form === '그룹' ? 8 : 1,
-  emotions: program.emotions.join(', '),
-  supplies: program.supplies.slice(0, 2),
-  caution: '없음',
-  staff: index === 0 ? '임상심리사 1인' : `${program.field} 치료사 1인`,
-  activities: [
-    {
-      title: `${session} — ${PHASE_NAMES[index].split(' ')[0]} 활동`,
-      steps: [
-        '앞 단계에서 다룬 내용을 짧게 되짚는다.',
-        `${session}의 주제를 ${program.field} 활동으로 다룬다.`,
-        '느낀 점을 기록지에 남기고 다음 단계를 예고한다.',
-      ],
-    },
-  ],
-})
 
 /*
  * 붙은 활동의 치유단계를 PHASE 자리에 옮긴다.
@@ -91,28 +41,25 @@ function phasesFromActivity(program, activity) {
      */
     activities: phase.blocks.map((block) => ({
       title: block.kind === '인문 문장' ? `${block.activity} · 인문 문장` : block.activity,
-      steps: [
-        block.kind === '인문 문장'
-          ? sentenceAt(block.bookId, block.sentence) ?? '가리킨 문장을 찾을 수 없습니다'
-          : block.text,
-      ],
+      steps: block.kind === '인문 문장'
+        ? [sentenceAt(block.bookId, block.sentence) ?? '가리킨 문장을 찾을 수 없습니다']
+        /* 줄 하나가 절차 한 줄(a · b · c)이다 */
+        : block.text.split('\n').map((line) => line.trim()).filter(Boolean),
     })),
   }))
 }
 
+/*
+ * 이 회차의 PHASE. **붙은 활동이 유일한 출처다.**
+ *
+ * 예전에는 활동이 없는 회차를 생성기가 그럴듯한 문구로 채웠다
+ * (`…의 주제를 문학치료 활동으로 다룬다`). 활동을 붙이는 길이 생긴 뒤로는
+ * **그것이 지어낸 값임을 화면이 알 수 없다** — 붙지 않은 회차는 비워 두고
+ * 읽는 화면이 그 사실을 말한다.
+ */
 export function phasesOf(program, sessionIndex) {
-  const session = program.sessions[sessionIndex]
-  /* 활동이 붙어 있으면 그것이 원본이다. 생성기는 아직 안 붙은 회차만 채운다 */
-  const activity = findActivity(session?.activityId)
-  if (activity) return phasesFromActivity(program, activity)
-
-  return PHASE_NAMES.map((_, i) => {
-    /* 마음챙김 1세션 PHASE 1만 Figma 문구다 */
-    if (program.id === 'pg-3' && sessionIndex === 0 && i === 0) {
-      return { name: PHASE_NAMES[0], ...FIGMA_PHASE }
-    }
-    return phaseFor(program, session?.name ?? '', i)
-  })
+  const activity = findActivity(program.sessions[sessionIndex]?.activityId)
+  return activity ? phasesFromActivity(program, activity) : []
 }
 
 /*
@@ -165,7 +112,7 @@ export const programs = reactive([
     supplies: ['색연필', '감정 기록지', '필기구', '스케치북', '아크릴 물감'],
     summary: '마음챙김 호흡 기법으로 신체 각성을 조절하고, 자기 인식과 애착 패턴 이해를 돕는 6회기 개인 프로그램',
     minutes: 90,
-    sessions: S(['소개', '환기', '나라는 단어', '나의 충동 마주보기', '나의 애착 이해하기', '마무리']),
+    sessions: S([{ name: '소개', activityId: 'act-4' }, '환기', '나라는 단어', '나의 충동 마주보기', '나의 애착 이해하기', '마무리']),
   }),
   P('pg-4', '노년층 자서전 쓰기 프로그램', 'PTSD', {
     rating: 3.9,

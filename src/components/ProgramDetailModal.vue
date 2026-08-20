@@ -12,8 +12,12 @@ import ModalShell from './ModalShell.vue'
  * 모달을 겹쳐 띄우면 history가 두 겹이 되어 뒤로가기를 두 번 눌러야 목록으로
  * 돌아온다(일정 상세에서 겪은 것과 같은 문제다).
  *
- * 세션 안에서는 PHASE를 차례로 넘긴다. 다섯 PHASE가 한 세션의 흐름이라
- * 목록으로 두지 않고 페이지로 넘긴다 — 지금 어디인지가 `1/5`로 남는다.
+ * 세션 안에서는 PHASE를 차례로 넘긴다. PHASE가 한 세션의 흐름이라 목록으로 두지
+ * 않고 페이지로 넘긴다 — 지금 어디인지가 `1/5`로 남는다. **개수는 붙은 활동이
+ * 정한다**(4.8.9절).
+ *
+ * **활동이 붙지 않은 회차는 비어 있다.** 예전에는 생성기가 그럴듯한 문구로 채웠는데,
+ * 그것이 지어낸 값임을 화면에서 알 수 없었다 — 지금은 무엇이 없는지 말한다.
  */
 const props = defineProps({
   program: { type: Object, required: true },
@@ -139,6 +143,14 @@ function settle() {
       </div>
     </div>
 
+    <!-- 아직 활동이 붙지 않은 회차. 지어낸 내용으로 채우지 않는다 -->
+    <div v-else-if="!phase" class="flex flex-1 flex-col items-center justify-center gap-1 border-t border-border-default p-4 text-center">
+      <p class="text-body font-medium">이 회차에 붙은 세션 활동이 없습니다</p>
+      <p class="text-label text-text-secondary">
+        저작도구 · 프로그램에서 회차에 활동을 붙이면 여기에 내용이 나옵니다
+      </p>
+    </div>
+
     <!-- 세션 상세: 좌 PHASE 내용 / 우 준비물·주의사항·담당 -->
     <div v-else class="flex items-stretch border-t border-border-default">
       <div class="flex min-w-0 flex-1 flex-col border-r border-border-default">
@@ -219,7 +231,7 @@ function settle() {
 
       <template v-else>
         <p class="min-w-0 flex-1 px-1 text-label text-text-secondary">
-          {{ phaseIndex + 1 }}/{{ phases.length }}
+          {{ phases.length ? `${phaseIndex + 1}/${phases.length}` : '' }}
         </p>
         <button
           v-if="phaseIndex > 0"

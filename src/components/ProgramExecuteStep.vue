@@ -180,8 +180,9 @@ const blockedStyle = computed(() => {
             <p class="shrink-0 text-label font-medium">{{ selected + 1 }}회차</p>
             <h3 class="min-w-0 truncate text-title-sm font-semibold">{{ entry.name }}</h3>
           </div>
+          <!-- 활동이 붙지 않은 회차는 보여줄 내용이 없다. 지어내지 않는다 -->
           <p class="text-caption text-text-secondary">
-            {{ detail?.activities[0]?.steps[1] ?? '' }}
+            {{ detail ? (detail.activities[0]?.steps[0] ?? '') : '이 회차에 붙은 세션 활동이 없습니다' }}
           </p>
         </div>
 
