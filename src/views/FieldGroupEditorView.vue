@@ -7,6 +7,7 @@ import {
 } from '../mocks/dataFields.js'
 import InlineCallout from '../components/InlineCallout.vue'
 import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
+import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
 
 /*
  * 데이터 필드 저작 — 저작도구 '데이터 필드'의 편집 화면 (축소 버전).
@@ -105,6 +106,16 @@ function runPending() {
   action?.()
 }
 
+/*
+ * **'나가기(저장 안 함)'는 편집을 되돌리고 나간다.** 되돌리지 않으면
+ * `isDirty`가 그대로라 라우터 가드가 다시 막고, 경고만 다시 뜬다 —
+ * 버튼이 아무 일도 하지 않는 것처럼 보인다.
+ */
+function discardAndRun() {
+  draft.value = JSON.parse(snapshot.value)
+  runPending()
+}
+
 function saveAndRun() {
   /* 저장할 수 없는 상태면 저장하지 않고 나간다 — 반쪽짜리 정의를 남기지 않는다 */
   if (!blocked.value) commit()
@@ -120,7 +131,26 @@ onBeforeRouteLeave((to, from) => {
 })
 
 const addField = () => draft.value.fields.push({ name: '', type: 'text', unit: '', valuesText: '' })
-const removeField = (i) => draft.value.fields.splice(i, 1)
+
+/*
+ * **삭제는 확인을 거친다.** 되돌릴 자리가 없는 조작이라 한 번 묻는다(3.6절).
+ * 이름이 비어 있는 줄은 잃을 것이 없으므로 바로 지운다.
+ * **필드를 지우면 뒤 필드의 코드명이 한 칸씩 당겨진다** — 확인 문구가 그것을 말한다.
+ */
+const deleting = ref(null)
+
+function askRemove(i) {
+  if (!draft.value.fields[i].name.trim()) {
+    draft.value.fields.splice(i, 1)
+    return
+  }
+  deleting.value = { index: i, label: `${previewCode(i)} · ${draft.value.fields[i].name}` }
+}
+
+function confirmRemove() {
+  draft.value.fields.splice(deleting.value.index, 1)
+  deleting.value = null
+}
 
 /*
  * 코드명 미리보기. 저장한 뒤 그리는 값과 같은 함수를 쓴다.
@@ -245,9 +275,10 @@ const previewCode = (i) => codeOf({ id: draft.value.id.trim().toUpperCase() }, i
                 class="h-11 w-20 shrink-0 rounded-lg border border-border-default bg-surface-field px-2 text-center text-label text-text-primary"
                 placeholder="단위"
               />
+              <!-- 파괴적 조작이라 경고색이다 -->
               <button
-                class="flex size-11 shrink-0 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed"
-                @click="removeField(i)"
+                class="flex size-11 shrink-0 items-center justify-center rounded-lg text-danger-fg active:bg-danger-bg"
+                @click="askRemove(i)"
               >
                 <Trash2 :size="16" />
               </button>
@@ -274,10 +305,19 @@ const previewCode = (i) => codeOf({ id: draft.value.id.trim().toUpperCase() }, i
       </section>
     </div>
 
+    <DeleteConfirmModal
+      v-if="deleting"
+      heading="필드를 삭제할까요?"
+      :detail="deleting.label"
+      warning="뒤 필드의 코드명이 한 칸씩 당겨지고, 저장하면 되돌릴 수 없습니다."
+      @confirm="confirmRemove"
+      @close="deleting = null"
+    />
+
     <UnsavedWarningModal
       v-if="pendingAction"
       subject="데이터 필드 정의"
-      @discard="runPending"
+      @discard="discardAndRun"
       @save="saveAndRun"
       @close="pendingAction = null"
     />

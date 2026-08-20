@@ -13,6 +13,7 @@ import { programs } from '../mocks/programs.js'
 import { dimensions } from '../mocks/analysis.js'
 import InlineCallout from '../components/InlineCallout.vue'
 import UnsavedWarningModal from '../components/UnsavedWarningModal.vue'
+import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
 
 /*
  * 프로세스 저작 — 저작도구 '프로세스'의 편집 화면 (MVP).
@@ -129,7 +130,29 @@ function pickCondition(condition) {
 
 const addNode = (type) =>
   draft.value.nodes.push({ type, phase: null, surveyCodes: [], programIds: [] })
-const removeNode = (i) => draft.value.nodes.splice(i, 1)
+/*
+ * **삭제는 확인을 거친다.** 노드 하나가 곧 환자가 지나는 단계 하나라
+ * 잘못 지우면 흐름이 통째로 바뀐다(3.6절). 아무것도 고르지 않은 빈 노드는
+ * 잃을 것이 없으므로 바로 지운다.
+ */
+const deleting = ref(null)
+
+function askRemoveNode(i) {
+  const node = draft.value.nodes[i]
+  if (!node.surveyCodes.length && !node.programIds.length) {
+    draft.value.nodes.splice(i, 1)
+    return
+  }
+  deleting.value = {
+    index: i,
+    label: node.phase ? `${node.type} (${node.phase})` : node.type,
+  }
+}
+
+function confirmRemoveNode() {
+  draft.value.nodes.splice(deleting.value.index, 1)
+  deleting.value = null
+}
 
 function moveNode(i, step) {
   const to = i + step
@@ -204,6 +227,16 @@ function runPending() {
   const action = pendingAction.value
   pendingAction.value = null
   action?.()
+}
+
+/*
+ * **'나가기(저장 안 함)'는 편집을 되돌리고 나간다.** 되돌리지 않으면
+ * `isDirty`가 그대로라 라우터 가드가 다시 막고, 경고만 다시 뜬다 —
+ * 버튼이 아무 일도 하지 않는 것처럼 보인다.
+ */
+function discardAndRun() {
+  draft.value = JSON.parse(snapshot.value)
+  runPending()
 }
 
 function saveAndRun() {
@@ -366,9 +399,10 @@ onBeforeRouteLeave((to, from) => {
               >
                 <component :is="move < 0 ? ChevronUp : ChevronDown" :size="16" />
               </button>
+              <!-- 파괴적 조작이라 경고색이다 -->
               <button
-                class="flex size-11 shrink-0 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed"
-                @click="removeNode(i)"
+                class="flex size-11 shrink-0 items-center justify-center rounded-lg text-danger-fg active:bg-danger-bg"
+                @click="askRemoveNode(i)"
               >
                 <Trash2 :size="16" />
               </button>
@@ -436,10 +470,19 @@ onBeforeRouteLeave((to, from) => {
       </section>
     </div>
 
+    <DeleteConfirmModal
+      v-if="deleting"
+      heading="노드를 삭제할까요?"
+      :detail="deleting.label"
+      warning="환자가 지나는 단계가 하나 줄고, 저장하면 되돌릴 수 없습니다."
+      @confirm="confirmRemoveNode"
+      @close="deleting = null"
+    />
+
     <UnsavedWarningModal
       v-if="pendingAction"
       subject="프로세스 정의"
-      @discard="runPending"
+      @discard="discardAndRun"
       @save="saveAndRun"
       @close="pendingAction = null"
     />

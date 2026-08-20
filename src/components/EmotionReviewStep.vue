@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Printer, PencilLine, Check, ArrowRight, Activity } from 'lucide-vue-next'
 import { processFor } from '../mocks/processLibrary.js'
-import { PROCESS_STEPS, stepIndexOf, completionOf } from '../mocks/process.js'
+import { stepsOf, stepIndexOf, completionOf } from '../mocks/process.js'
 import { surveys, responseOf, answeredCount } from '../mocks/surveys.js'
 import InlineCallout from './InlineCallout.vue'
 import BioSignalModal from './BioSignalModal.vue'
@@ -13,28 +13,36 @@ import { josa } from '../text.js'
  * 코어 프로세스 1·4단계 '감정평가' (Figma 148:7935).
  *
  * 사전과 사후가 **같은 화면**이다. 보는 설문도 판정 규칙도 같고 시점만 다르다 —
- * 화면을 둘로 나누면 같은 규칙이 두 곳에 복제된다. 시점은 단계 번호가 정한다
- * (1단계 = 사전, 4단계 = 사후).
+ * 화면을 둘로 나누면 같은 규칙이 두 곳에 복제된다. **시점은 프로세스 정의의
+ * 노드가 들고 있다** — 단계 번호로 판정하면 정의마다 번호가 달라 어긋난다(4.8.6절).
  *
  * 설문 자체는 **환자가 작성한다.** '작성하기'를 누르면 셸을 걷은 설문 수행
  * 화면으로 넘어간다 — 태블릿을 환자에게 건네는 유일한 지점이다(4.0.1절).
  */
 const props = defineProps({
   patient: { type: Object, required: true },
-  /* 이 화면이 붙은 단계. 1이면 사전, 4면 사후다 */
+  /* 이 화면이 붙은 단계 번호. 지난 단계인지 판정하는 데 쓴다 */
   step: { type: Number, required: true },
+  /* 정의의 노드가 들고 있는 시점. 정해지지 않았으면 사전으로 본다 */
+  phase: { type: String, default: null },
 })
 
 const emit = defineEmits(['advance'])
 
 const router = useRouter()
 
-const PHASES = [
-  { key: 'pre', label: '사전', step: 1 },
-  { key: 'post', label: '사후', step: 4 },
-]
+/*
+ * 시점 칩. 각 시점이 몇 번째 단계인지는 **정의에서 찾는다** —
+ * 사전이 늘 1단계인 것이 아니다.
+ */
+const PHASES = computed(() =>
+  [{ key: 'pre', label: '사전' }, { key: 'post', label: '사후' }].map((item) => ({
+    ...item,
+    step: stepsOf(props.patient).findIndex((s) => s.phase === item.label),
+  })).filter((item) => item.step >= 0),
+)
 
-const phase = ref(props.step === 4 ? 'post' : 'pre')
+const phase = ref(props.phase === '사후' ? 'post' : 'pre')
 
 /*
  * 아직 도달하지 않은 시점은 볼 수 없다 — 사전 단계에서 사후 설문을 열면
@@ -121,7 +129,7 @@ function advance(event) {
     return
   }
   if (locked.value) {
-    say(event, '이미 지난 단계입니다', `지금은 ${PROCESS_STEPS[stepIndexOf(props.patient)] ?? ''} 단계입니다`)
+    say(event, '이미 지난 단계입니다', `지금은 ${stepsOf(props.patient)[stepIndexOf(props.patient)]?.label ?? ''} 단계입니다`)
     return
   }
   if (remaining.value) {
@@ -150,7 +158,7 @@ const blockedStyle = computed(() => {
  * 라벨이 `종료 확정`이고, 무엇이 일어나는지 왼쪽에 한 줄로 밝힌다(Figma 186:6607).
  * '이동'이라고 적으면 되돌릴 수 있는 화면 전환으로 읽힌다.
  */
-const isFinal = computed(() => props.step === 4)
+const isFinal = computed(() => props.phase === '사후')
 
 /*
  * **이미 끝난 프로세스에는 종료를 묻지 않는다.** 완료 환자의 사후 화면을 다시
@@ -164,7 +172,7 @@ const completion = computed(() => completionOf(props.patient))
 const nextLabel = computed(() => {
   if (ended.value) return '프로세스 종료 보기'
   if (isFinal.value) return '종료 확정'
-  return `${josa(PROCESS_STEPS[props.step + 1] ?? '', '으로', '로')} 이동`
+  return `${josa(stepsOf(props.patient)[props.step + 1]?.label ?? '', '으로', '로')} 이동`
 })
 
 /* 확인 문구의 '현재 시각'. 종료 시각이 아니라 지금 언제인지를 알려주는 값이다 */

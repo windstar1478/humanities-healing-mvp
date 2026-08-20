@@ -1,53 +1,64 @@
 /*
  * 치유 프로세스와 평가 지표 mock (Figma 130:3152 · 148:5384).
  *
- * ⚠️ 확인 필요: 프로세스 단계 구성은 원래 환자마다 다르고 백엔드가 내려줄 값이다.
- *    상세 치유 프로세스 목업이 나오기 전까지는 아래 기본 6단계를 모두에게 적용한다.
+ * 단계 구성은 **환자에게 붙은 프로세스 정의**가 정한다(`stepsOf`).
  * ⚠️ 확인 필요: 이력 버전과 평가 지표도 Figma 한 명분을 모든 환자에게 그대로 쓴다.
  */
 
 import { reactive } from 'vue'
-
-/* 기본 프로세스. 감정평가가 두 번 나오는 것은 사전·사후이기 때문이다 */
-export const PROCESS_STEPS = [
-  '프로세스 시작',
-  '감정평가',
-  '프로그램 처방',
-  '프로그램 수행',
-  '감정평가',
-  '프로세스 종료',
-]
+import { processFor } from './processLibrary.js'
 
 /*
- * 환자의 status가 몇 번째 단계인지. 명단의 status 문자열이 그대로 들어온다.
- * 사전·사후 감정평가가 각각 1번·4번으로 갈린다.
+ * **단계는 프로세스 정의가 정한다.** 정의의 노드(감정평가 · 프로그램 처방 ·
+ * 프로그램 수행)를 그대로 늘어놓고 **양끝에 프로세스 시작과 종료를 붙인다.**
+ * 노드 수도 순서도 정의마다 다르다 — 처방과 수행을 번갈아 두 번 도는 프로세스도
+ * 성립한다(4.8.6절). 여기 여섯 단계를 상수로 두었더니 저작에서 만든 정의를
+ * 화면이 따라 그리지 못했다.
+ *
+ * 시작과 종료는 **고정된 양끝**이다. 저작에서 다루는 노드가 아니라 프로세스를
+ * 붙이고 끝내는 자리이고, 화면(0단계 · 마지막 단계)도 이미 그 둘을 갖고 있다.
  */
-const STEP_OF_STATUS = {
-  '접수 완료': 0,
-  '프로세스 시작': 0,
-  '감정평가 (사전)': 1,
-  '프로그램 처방': 2,
-  '프로그램 수행': 3,
-  '감정평가 (사후)': 4,
-  '프로세스 종료': 5,
+const START = { type: '시작', label: '프로세스 시작', status: '프로세스 시작' }
+const END = { type: '종료', label: '프로세스 종료', status: '프로세스 종료' }
+
+/* 정의의 단계 하나를 스테퍼 노드로 옮긴다. 감정평가만 시점을 갖는다 */
+function nodeOf(step) {
+  if (step.name.startsWith('감정평가')) {
+    const phase = step.name.includes('사후') ? '사후' : step.name.includes('사전') ? '사전' : null
+    return {
+      type: '감정평가',
+      phase,
+      label: '감정평가',
+      /* 환자 레코드의 status 문자열과 같은 형식이어야 한다 */
+      status: phase ? `감정평가 (${phase})` : '감정평가',
+    }
+  }
+  return { type: step.name, phase: null, label: step.name, status: step.name }
 }
 
 /*
- * 단계 번호 → 상태 문자열. 위 표의 역방향이다.
- * 단계를 넘길 때 환자의 status·nextStep을 여기서 가져간다 —
- * 화면이 문자열을 직접 적으면 두 표가 갈라진다.
+ * 이 환자의 단계 목록. 스테퍼도 단계 본문도 라우팅도 전부 이것을 센다.
+ *
+ * ⚠️ 같은 종류의 노드가 둘 이상이면 status 문자열이 겹친다(수행 노드 두 개).
+ *    지금은 앞의 것을 현재 단계로 본다 — 환자 레코드가 단계 번호를 들고 오면
+ *    문자열 대조 자체가 없어진다.
  */
-export const STATUS_OF_STEP = [
-  '프로세스 시작',
-  '감정평가 (사전)',
-  '프로그램 처방',
-  '프로그램 수행',
-  '감정평가 (사후)',
-  '프로세스 종료',
-]
+export function stepsOf(patient) {
+  const definition = patient ? processFor(patient) : null
+  return [START, ...(definition?.steps ?? []).map(nodeOf), END]
+}
+
+/* 단계 번호 → 환자 status 문자열. 화면이 문자열을 직접 적으면 갈라진다 */
+export const statusOfStep = (patient, index) => stepsOf(patient)[index]?.status ?? null
+
+/* 명단에만 있고 단계 이름과 다른 status. 아직 프로세스를 붙이기 전이다 */
+const BEFORE_START = ['접수 완료']
 
 export function stepIndexOf(patient) {
-  return STEP_OF_STATUS[patient.status] ?? 0
+  if (!patient) return 0
+  if (BEFORE_START.includes(patient.status)) return 0
+  const at = stepsOf(patient).findIndex((step) => step.status === patient.status)
+  return at >= 0 ? at : 0
 }
 
 /*

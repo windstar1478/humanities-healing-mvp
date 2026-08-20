@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Check, Play, User } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
-import { PROCESS_STEPS, STATUS_OF_STEP, stepIndexOf, stepStateOf, completeProcess } from '../mocks/process.js'
+import { stepsOf, statusOfStep, stepIndexOf, stepStateOf, completeProcess } from '../mocks/process.js'
 import InlineCallout from '../components/InlineCallout.vue'
 import { josa } from '../text.js'
 import ProcessStartStep from '../components/ProcessStartStep.vue'
@@ -13,10 +13,10 @@ import ProgramExecuteStep from '../components/ProgramExecuteStep.vue'
 import ProcessCompleteStep from '../components/ProcessCompleteStep.vue'
 
 /*
- * 코어 프로세스 6단계의 공통 셸 (Figma 148:7242 · 148:7729 · 173:5511 ·
+ * 코어 프로세스의 공통 셸 (Figma 148:7242 · 148:7729 · 173:5511 ·
  * 172:4483 · 173:5793).
  *
- * 여섯 화면이 같은 머리를 쓴다 — 환자 정보 + **컴팩트 스테퍼** + '환자 상세'로
+ * 모든 단계가 같은 머리를 쓴다 — 환자 정보 + **컴팩트 스테퍼** + '환자 상세'로
  * 돌아가는 버튼. 스테퍼가 곧 단계 이동 장치라서, 환자 상세의 큰 스테퍼와
  * 같은 규칙(완료·진행 중은 갈 수 있고 대기는 못 간다)을 그대로 쓴다.
  * 머리를 화면마다 다시 그리면 여섯 곳의 규칙이 갈라진다.
@@ -32,6 +32,13 @@ const step = computed(() => Number(route.params.step))
 
 const currentStep = computed(() => (patient.value ? stepIndexOf(patient.value) : 0))
 
+/*
+ * **단계는 프로세스 정의가 정한다**(4.8.6절). 개수도 순서도 정의마다 다르므로
+ * 화면이 상수 목록을 들지 않는다 — 시작과 종료만 고정된 양끝이다.
+ */
+const steps = computed(() => stepsOf(patient.value))
+const node = computed(() => steps.value[step.value] ?? null)
+
 /* 판정은 mocks/process.js 한 곳에 있다. 환자 상세의 큰 스테퍼와 같은 규칙이다 */
 function stepState(index) {
   return stepStateOf(patient.value, index)
@@ -40,12 +47,12 @@ function stepState(index) {
 /*
  * 단계를 마치고 다음으로 넘어간다. 환자의 현재 단계·다음 단계가 함께 바뀐다 —
  * 스테퍼도 우측 패널도 같은 레코드를 보므로 여기 한 번만 고치면 된다.
- * 다음 단계 이름은 `PROCESS_STEPS`가 정한다. 화면이 따로 적으면 갈라진다.
+ * 다음 단계 이름은 `statusOfStep`이 정한다. 화면이 따로 적으면 갈라진다.
  */
 function advance() {
   const next = step.value + 1
-  patient.value.status = STATUS_OF_STEP[next] ?? patient.value.status
-  patient.value.nextStep = STATUS_OF_STEP[next + 1] ?? null
+  patient.value.status = statusOfStep(patient.value, next) ?? patient.value.status
+  patient.value.nextStep = statusOfStep(patient.value, next + 1)
   router.push({ path: `/process/${patient.value.id}/${next}` })
 }
 
@@ -57,7 +64,7 @@ function advance() {
 function complete() {
   /* 이미 끝난 프로세스를 다시 종결하지 않는다. 종료 시각이 오늘로 덮인다 */
   if (patient.value.process !== '완료') completeProcess(patient.value)
-  router.push({ path: `/process/${patient.value.id}/5` })
+  router.push({ path: `/process/${patient.value.id}/${steps.value.length - 1}` })
 }
 
 /* 처방은 프로그램을 환자에게 붙이는 일이다. 그 뒤 단계 이동은 advance와 같다 */
@@ -74,7 +81,7 @@ function goStep(i, event) {
     const r = event.currentTarget.getBoundingClientRect()
     blocked.value = {
       title: '아직 진행할 수 없는 단계입니다',
-      detail: `${josa(PROCESS_STEPS[currentStep.value], '을', '를')} 마치면 열립니다`,
+      detail: `${josa(steps.value[currentStep.value]?.label ?? '', '을', '를')} 마치면 열립니다`,
       x: r.left + r.width / 2,
       y: r.bottom,
     }
@@ -119,7 +126,7 @@ const blockedStyle = computed(() => {
         완료는 체크, 진행 중은 accent fill, 대기는 빈 점선 원. 순서 숫자는 없다.
       -->
       <div class="flex min-w-0 flex-1 items-start justify-center">
-        <template v-for="(label, i) in PROCESS_STEPS" :key="i">
+        <template v-for="(item, i) in steps" :key="i">
           <span
             v-if="i > 0"
             class="mt-3.5 min-w-3 flex-1"
@@ -149,7 +156,7 @@ const blockedStyle = computed(() => {
                 ? 'font-medium text-interactive-default'
                 : stepState(i) === 'waiting' ? 'text-text-disabled' : 'text-text-secondary'"
             >
-              {{ label }}
+              {{ item.label }}
             </span>
           </button>
         </template>
@@ -171,34 +178,35 @@ const blockedStyle = computed(() => {
         단계에 머물러 무엇을 더 해야 하는지 알 수 없으므로 다음 단계로 넘긴다
       -->
       <ProcessStartStep
-        v-if="step === 0"
+        v-if="node?.type === '시작'"
         :patient="patient"
         @assign="router.push({ path: `/process/${patient.id}/1` })"
       />
-      <!-- 사전(1)과 사후(4)는 같은 화면이다. 시점만 단계 번호가 정한다 -->
+      <!-- 사전과 사후는 같은 화면이다. 시점은 정의의 노드가 들고 있다 -->
       <EmotionReviewStep
-        v-else-if="step === 1 || step === 4"
+        v-else-if="node?.type === '감정평가'"
         :patient="patient"
         :step="step"
-        @advance="step === 4 ? complete() : advance()"
+        :phase="node.phase"
+        @advance="node.phase === '사후' ? complete() : advance()"
       />
-      <!-- 2단계. 고른 프로그램은 환자 레코드에 남는다 -->
+      <!-- 고른 프로그램은 환자 레코드에 남는다 -->
       <ProgramPrescribeStep
-        v-else-if="step === 2"
+        v-else-if="node?.type === '프로그램 처방'"
         :patient="patient"
         @advance="prescribe"
       />
-      <!-- 3단계. 마지막 회차를 마치면 사후 감정평가로 넘어간다 -->
+      <!-- 마지막 회차를 마치면 다음 노드로 넘어간다 -->
       <ProgramExecuteStep
-        v-else-if="step === 3"
+        v-else-if="node?.type === '프로그램 수행'"
         :patient="patient"
         @advance="advance"
       />
-      <!-- 5단계. 결정하는 화면이 아니라 결과를 보여주는 화면이다 -->
-      <ProcessCompleteStep v-else-if="step === 5" :patient="patient" />
+      <!-- 결정하는 화면이 아니라 결과를 보여주는 화면이다 -->
+      <ProcessCompleteStep v-else-if="node?.type === '종료'" :patient="patient" />
       <div v-else class="flex min-h-0 flex-1 items-center justify-center">
         <p class="text-body text-text-disabled">
-          {{ PROCESS_STEPS[step] }} 단계는 준비 중입니다
+          {{ node?.label ?? '' }} 단계는 준비 중입니다
         </p>
       </div>
     </section>

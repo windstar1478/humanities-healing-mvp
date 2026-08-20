@@ -7,7 +7,7 @@ import {
 } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
 import {
-  PROCESS_STEPS, stepIndexOf, stepStateOf,
+  stepsOf, stepIndexOf, stepStateOf,
   processHistory, historyOf, CURRENT_VERSION,
   keyMetricsOf, metricPoints, SCALE_SPAN, SCALE_STEPS,
 } from '../mocks/process.js'
@@ -41,6 +41,9 @@ const patient = computed(() => patients.find((p) => p.id === route.params.id) ??
  * 대기는 빈 점선 원. 순서 숫자는 쓰지 않는다.
  */
 const currentStep = computed(() => (patient.value ? stepIndexOf(patient.value) : 0))
+
+/* 단계는 환자에게 붙은 프로세스 정의가 정한다(4.8.6절) */
+const steps = computed(() => stepsOf(patient.value))
 
 /* 프로세스가 끝났거나 중단됐으면 '진행 중'인 단계가 없다 */
 const isRunning = computed(() => patient.value?.process === '진행 중')
@@ -91,7 +94,7 @@ function openStep(i, event) {
     const r = event.currentTarget.getBoundingClientRect()
     stepBlocked.value = {
       title: '아직 진행할 수 없는 단계입니다',
-      detail: `${josa(PROCESS_STEPS[currentStep.value], '을', '를')} 마치면 열립니다`,
+      detail: `${josa(steps.value[currentStep.value]?.label ?? '', '을', '를')} 마치면 열립니다`,
       x: r.left + r.width / 2,
       y: r.bottom,
     }
@@ -232,7 +235,7 @@ const editingSubject = computed(() => {
  * 메모를 쓴 시점이 프로세스의 어디였는지가 나중에 읽을 때의 단서이기 때문이다.
  */
 const currentContext = computed(() => {
-  const step = PROCESS_STEPS[currentStep.value]
+  const step = steps.value[currentStep.value]?.label ?? ''
   if (isRunning.value && step === '프로그램 수행' && sessions.value) {
     return `${step} · ${Math.min(sessions.value.done + 1, sessions.value.total)}회차`
   }
@@ -408,12 +411,13 @@ onBeforeRouteLeave((to, from) => {
       </div>
 
       <div class="flex justify-center">
-        <div class="flex w-[666px] items-start">
-          <template v-for="(step, i) in PROCESS_STEPS" :key="i">
+        <!-- 노드 수가 정의마다 다르다. 연결선이 늘고 줄어 폭을 맞춘다 -->
+        <div class="flex w-full max-w-[666px] items-start">
+          <template v-for="(item, i) in steps" :key="i">
             <!-- 연결선. 지나온 구간은 실선, 앞으로 갈 구간은 점선 -->
             <span
               v-if="i > 0"
-              class="mt-6 w-6 shrink-0"
+              class="mt-6 min-w-6 flex-1"
               :class="stepState(i) === 'waiting'
                 ? 'border-t border-dashed border-text-disabled'
                 : 'h-px bg-border-default'"
@@ -455,7 +459,7 @@ onBeforeRouteLeave((to, from) => {
                     'text-text-disabled': stepState(i) === 'waiting',
                   }"
                 >
-                  {{ step }}
+                  {{ item.label }}
                 </span>
                 <span
                   class="whitespace-nowrap px-2.5 text-count"
@@ -476,10 +480,10 @@ onBeforeRouteLeave((to, from) => {
       <div class="flex items-center border-t border-border-default pt-2">
         <span class="flex min-w-0 flex-1 flex-col gap-0.5">
           <span class="text-caption text-text-secondary">
-            현재 단계: {{ Math.min(currentStep + 1, PROCESS_STEPS.length) }}/{{ PROCESS_STEPS.length }}
+            현재 단계: {{ Math.min(currentStep + 1, steps.length) }}/{{ steps.length }}
           </span>
           <span class="text-label font-medium text-text-primary">
-            {{ PROCESS_STEPS[currentStep] }}
+            {{ steps[currentStep]?.label }}
             <template v-if="isRunning && progress?.detail">
               — {{ progress.detail }}
             </template>
@@ -491,7 +495,7 @@ onBeforeRouteLeave((to, from) => {
           class="flex h-11 w-[170px] shrink-0 items-center justify-center gap-1 rounded-2xl text-body text-text-primary active:bg-surface-pressed"
           @click="openStep(currentStep, $event)"
         >
-          <span class="truncate">{{ PROCESS_STEPS[currentStep] }} 이어하기</span>
+          <span class="truncate">{{ steps[currentStep]?.label }} 이어하기</span>
           <ChevronRight :size="12" class="shrink-0" />
         </button>
       </div>
