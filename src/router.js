@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { session } from './authState.js'
 import { findTool } from './mocks/authoring.js'
 import { surveys } from './mocks/surveys.js'
+import { findGroup } from './mocks/dataFields.js'
 
 /*
  * 우측 환자 패널은 '환자를 다루는 화면'에만 붙는다.
@@ -87,6 +88,19 @@ const router = createRouter({
         to.params.code === 'new' || surveys[to.params.code]
           ? true
           : { path: '/authoring/scale', replace: true },
+    },
+    /*
+     * 데이터 필드 저작. **편집 단위가 필드가 아니라 그룹이다** —
+     * 코드명이 그룹 접두 + 순번이라 필드는 자기 그룹 안에서만 뜻이 있다.
+     */
+    {
+      path: '/authoring/field/:group',
+      component: () => import('./views/FieldGroupEditorView.vue'),
+      meta: { noPatientPanel: true },
+      beforeEnter: (to) =>
+        to.params.group === 'new' || findGroup(to.params.group)
+          ? true
+          : { path: '/authoring/field', replace: true },
     },
     /*
      * 저작도구 하나. 어느 도구인지가 경로에 들어간다 —

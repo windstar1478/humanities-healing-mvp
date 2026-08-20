@@ -80,6 +80,7 @@ export const authoringTools = [
         ROW(g.id, `${g.name}(${g.id})`, [g.category, `필드 ${g.fields.length}`]),
       ),
     itemLabel: '그룹',
+    editPath: (id) => `/authoring/field/${id ?? 'new'}`,
   },
   {
     key: 'spec',
