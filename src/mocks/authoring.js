@@ -2,6 +2,7 @@ import { surveys } from './surveys.js'
 import { processLibrary } from './processLibrary.js'
 import { programs } from './programs.js'
 import { fieldGroups } from './dataFields.js'
+import { dataSpecs, categoryOf, fieldsOf } from './dataSpecs.js'
 
 /*
  * 저작도구의 목록 정의.
@@ -89,8 +90,12 @@ export const authoringTools = [
     legacy: null,
     summary: '필드를 증상 · 기관 단위로 묶는다',
     rename: null,
-    items: () => null,
+    items: () =>
+      dataSpecs.map((s) =>
+        ROW(s.id, s.name, [categoryOf(s), s.condition, `필드 ${fieldsOf(s).length}`, s.org]),
+      ),
     itemLabel: '명세',
+    editPath: (id) => `/authoring/spec/${id ?? 'new'}`,
   },
   {
     key: 'process',

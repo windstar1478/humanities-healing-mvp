@@ -4,6 +4,7 @@ import { findTool } from './mocks/authoring.js'
 import { surveys } from './mocks/surveys.js'
 import { findGroup } from './mocks/dataFields.js'
 import { findProcess } from './mocks/processLibrary.js'
+import { findSpec } from './mocks/dataSpecs.js'
 
 /*
  * 우측 환자 패널은 '환자를 다루는 화면'에만 붙는다.
@@ -102,6 +103,16 @@ const router = createRouter({
         to.params.group === 'new' || findGroup(to.params.group)
           ? true
           : { path: '/authoring/field', replace: true },
+    },
+    /* 데이터 명세 저작. 필드를 만드는 자리가 아니라 고르는 자리다 */
+    {
+      path: '/authoring/spec/:id',
+      component: () => import('./views/SpecEditorView.vue'),
+      meta: { noPatientPanel: true },
+      beforeEnter: (to) =>
+        to.params.id === 'new' || findSpec(to.params.id)
+          ? true
+          : { path: '/authoring/spec', replace: true },
     },
     /*
      * 프로세스 저작(MVP). 단계 골격은 코어 프로세스가 고정하고 있어

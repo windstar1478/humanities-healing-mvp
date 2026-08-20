@@ -66,6 +66,8 @@
   --color-red-100: #FBE7E7;
   --color-red-400: #E27D7D;
   --color-red-500: #D64545;
+  /* 채운 삭제 버튼의 pressed. 500과 800 사이가 너무 멀어 한 단계를 새로 만들었다 */
+  --color-red-600: #B23838;
   --color-red-800: #541212;
 
   --color-amber-100: #FCF1DA;
@@ -123,6 +125,14 @@
   /* status */
   --color-danger-bg:  var(--color-red-100);
   --color-danger-fg:  var(--color-red-500);
+  /*
+   * 채워진 파괴 버튼(삭제 확정). **다크에서 재매핑하지 않는다** —
+   * 표면은 다크에서 밝아지지만 이 값은 흰 글자를 얹는 자리라
+   * 밝히면 대비가 무너진다. 두 테마에서 같은 빨강을 쓴다.
+   */
+  --color-danger-fill:         var(--color-red-500);
+  --color-danger-fill-pressed: var(--color-red-600);
+  --color-text-on-danger:      var(--color-neutral-0);
   --color-warning-bg: var(--color-amber-100);
   --color-warning-fg: var(--color-amber-500);
   --color-success-bg: var(--color-green-100);

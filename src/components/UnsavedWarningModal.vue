@@ -51,9 +51,12 @@ function settle() {
       </div>
 
       <div class="flex items-center justify-between px-1">
-        <!-- 파괴적 선택지. 텍스트만 있는 버튼이라 글자색을 올려 눌린다 -->
+        <!--
+          파괴적 선택지. 색도 경고색이다(3.1절) — 자리를 떼어놓는 것만으로는
+          '무엇이 사라지는 쪽인가'가 보이지 않는다
+        -->
         <button
-          class="flex h-11 items-center justify-center text-label font-medium text-text-secondary active:text-text-primary"
+          class="flex h-11 items-center justify-center rounded-lg px-2 text-label font-medium text-danger-fg active:bg-danger-bg"
           @click="pick('discard', dismiss)"
         >
           나가기 (저장 안 함)

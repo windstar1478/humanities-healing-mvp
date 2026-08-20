@@ -38,8 +38,11 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal.vue'
  * ⚠️ Figma 디자인이 없다. 구버전 웹 화면의 구성만 참고한 MVP다.
  * ⚠️ **코어 프로세스 화면은 아직 표준형 네 노드를 전제로 그린다.** 노드 수가
  *    다른 정의를 환자에게 붙이면 스테퍼가 그대로 따라가지 못한다(6.2절 38번).
- * ⚠️ **정의가 프로그램 id를 들고 있지 않다.** 목업의 처방 항목은 임의 문구라
- *    이름으로 대조하고 있어, 기존 정의를 열면 후보가 비어 보인다.
+ * **처방할 프로그램은 저작이 고르지 않는다.** 처방은 그 자리에서 환자를 보고
+ * 상담사가 하는 일이라(4.6.3절), 정의를 만드는 사람이 미리 고르면 처방을 대신하는
+ * 셈이 된다. 처방 노드는 **그 증상에서 처방할 수 있는 프로그램을 보여주기만** 한다 —
+ * 이 노드에 이르렀을 때 무엇을 고르게 되는지 알아야 흐름을 짤 수 있기 때문이다.
+ * 효과성이 높은 것에 `추천` 배지가 붙되, 그것도 고르는 것이 아니라 읽는 값이다.
  */
 const route = useRoute()
 const router = useRouter()
@@ -68,21 +71,12 @@ function nodesFrom(process) {
         type: '감정평가',
         phase: PHASES.find((p) => step.name.includes(p)) ?? null,
         surveyCodes: (step.items ?? []).map((item) => item.code),
-        programIds: [],
       }
     }
     if (step.name === '프로그램 처방') {
-      return {
-        type: '프로그램 처방',
-        phase: null,
-        surveyCodes: [],
-        /* 정의가 프로그램 id를 들고 있지 않아 이름으로 맞춘다 */
-        programIds: programs
-          .filter((p) => (step.items ?? []).some((item) => item.label === p.name))
-          .map((p) => p.id),
-      }
+      return { type: '프로그램 처방', phase: null, surveyCodes: [] }
     }
-    return { type: '프로그램 수행', phase: null, surveyCodes: [], programIds: [] }
+    return { type: '프로그램 수행', phase: null, surveyCodes: [] }
   })
 }
 
@@ -107,7 +101,16 @@ const isDirty = computed(() => JSON.stringify(draft.value) !== snapshot.value)
 const surveyChoices = computed(() =>
   Object.values(surveys).filter((s) => s.scope === '공통' || s.scope === draft.value.condition),
 )
-const programChoices = computed(() => programs.filter((p) => p.condition === draft.value.condition))
+/*
+ * 이 증상에서 처방할 수 있는 프로그램. **읽기 전용 참고 목록**이고,
+ * 효과성이 가장 높은 것에 추천이 붙는다(`rating`).
+ */
+const programChoices = computed(() => {
+  const list = [...programs.filter((p) => p.condition === draft.value.condition)]
+    .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name, 'ko'))
+  /* 추천은 **하나뿐**이다. 절반에 배지가 붙으면 추천이 아니라 분류가 된다 */
+  return list.map((p, i) => ({ ...p, recommended: i === 0 }))
+})
 
 function toggle(list, value) {
   const at = list.indexOf(value)
@@ -122,14 +125,10 @@ function pickCondition(condition) {
     node.surveyCodes = node.surveyCodes.filter((code) =>
       surveyChoices.value.some((s) => s.code === code),
     )
-    node.programIds = node.programIds.filter((id) =>
-      programChoices.value.some((p) => p.id === id),
-    )
   }
 }
 
-const addNode = (type) =>
-  draft.value.nodes.push({ type, phase: null, surveyCodes: [], programIds: [] })
+const addNode = (type) => draft.value.nodes.push({ type, phase: null, surveyCodes: [] })
 /*
  * **삭제는 확인을 거친다.** 노드 하나가 곧 환자가 지나는 단계 하나라
  * 잘못 지우면 흐름이 통째로 바뀐다(3.6절). 아무것도 고르지 않은 빈 노드는
@@ -139,7 +138,7 @@ const deleting = ref(null)
 
 function askRemoveNode(i) {
   const node = draft.value.nodes[i]
-  if (!node.surveyCodes.length && !node.programIds.length) {
+  if (!node.surveyCodes.length) {
     draft.value.nodes.splice(i, 1)
     return
   }
@@ -192,14 +191,7 @@ const calloutOpen = ref(false)
 const goList = () => router.push({ path: '/authoring/process' })
 
 function commit() {
-  saveProcess({
-    ...draft.value,
-    name: draft.value.name.trim(),
-    nodes: draft.value.nodes.map((node) => ({
-      ...node,
-      programs: programs.filter((p) => node.programIds.includes(p.id)),
-    })),
-  })
+  saveProcess({ ...draft.value, name: draft.value.name.trim() })
   snapshot.value = JSON.stringify(draft.value)
 }
 
@@ -425,23 +417,27 @@ onBeforeRouteLeave((to, from) => {
               </button>
             </div>
 
-            <!-- 프로그램 처방: 후보 프로그램 -->
-            <div v-else-if="node.type === '프로그램 처방'" class="flex flex-wrap gap-1">
-              <button
-                v-for="program in programChoices"
-                :key="program.id"
-                class="flex h-11 items-center gap-1 rounded-lg border px-3 text-label"
-                :class="node.programIds.includes(program.id)
-                  ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
-                  : 'border-border-default text-text-secondary active:bg-surface-pressed'"
-                @click="toggle(node.programIds, program.id)"
-              >
-                <Check v-if="node.programIds.includes(program.id)" :size="12" class="shrink-0" />
-                {{ program.name }}
-              </button>
-              <p v-if="!programChoices.length" class="text-count text-text-secondary">
-                이 증상의 프로그램이 아직 없습니다
+            <!--
+              프로그램 처방: 고르는 자리가 아니다. 이 노드에서 무엇을 처방하게
+              되는지 보여주기만 한다 — 처방은 상담사가 그 자리에서 한다
+            -->
+            <div v-else-if="node.type === '프로그램 처방'" class="flex flex-col gap-1">
+              <p class="text-count text-text-secondary">
+                처방은 이 단계에서 상담사가 환자를 보고 고른다. 지금 고를 수 있는 것은 다음과 같다
               </p>
+              <div class="flex flex-wrap gap-1">
+                <span
+                  v-for="program in programChoices"
+                  :key="program.id"
+                  class="flex h-8 items-center gap-1 rounded-lg border border-border-default px-3 text-label text-text-secondary"
+                >
+                  {{ program.name }}
+                  <span v-if="program.recommended" class="text-count text-text-primary">추천</span>
+                </span>
+                <p v-if="!programChoices.length" class="text-count text-text-secondary">
+                  이 증상의 프로그램이 아직 없습니다
+                </p>
+              </div>
             </div>
 
             <!-- 프로그램 수행: 회차는 정의가 적지 않는다 -->

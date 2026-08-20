@@ -128,8 +128,15 @@ function settle() {
           <span class="w-[58px] shrink-0 text-count">{{ item.code }}</span>
           <span class="min-w-0 flex-1 truncate text-label font-medium">{{ item.label }}</span>
         </div>
-        <p v-if="!step.items.length" class="text-label text-text-disabled">
-          등록된 항목이 없습니다
+        <!--
+          처방·수행 단계는 정의가 내용을 들지 않는다. 처방할 프로그램은 그 자리에서
+          상담사가 고르고(4.6.3절), 회차는 처방된 프로그램과 일정이 정한다(4.6.4절).
+          '등록된 항목이 없습니다'로 두면 빠뜨린 것처럼 읽힌다
+        -->
+        <p v-if="!step.items.length" class="text-label text-text-secondary">
+          {{ step.name === '프로그램 처방'
+            ? '처방할 프로그램은 이 단계에서 환자를 보고 고른다'
+            : '회차는 처방된 프로그램과 잡힌 일정이 정한다' }}
         </p>
       </div>
     </div>

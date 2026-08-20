@@ -57,8 +57,9 @@ function settle() {
         >
           취소
         </button>
+        <!-- 파괴적 확정이라 채움도 빨강이다(3.1절) -->
         <button
-          class="flex h-9 items-center justify-center rounded-lg bg-surface-inverse px-3 py-2 text-body text-text-inverse active:bg-surface-inverse-pressed"
+          class="flex h-9 items-center justify-center rounded-lg bg-danger-fill px-3 py-2 text-body text-text-on-danger active:bg-danger-fill-pressed"
           @click="pick('confirm', dismiss)"
         >
           삭제

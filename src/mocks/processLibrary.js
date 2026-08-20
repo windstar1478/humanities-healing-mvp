@@ -206,9 +206,12 @@ export function saveProcess(draft) {
         const name = node.phase ? `감정평가(${node.phase})` : '감정평가'
         return EVAL(name, pick(node.surveyCodes))
       }
-      if (node.type === '프로그램 처방') {
-        return STEP('프로그램 처방', '', node.programs.map((p) => ({ code: p.field, label: p.name })))
-      }
+      /*
+       * **처방 노드도 내용을 적지 않는다.** 어떤 프로그램을 줄지는 그 자리에서
+       * 환자를 보고 상담사가 정한다(4.6.3절). 정의가 미리 골라두면 정의를 만든
+       * 사람이 처방을 대신하는 셈이고, 프로그램 목록이 바뀌면 그 선택이 낡는다.
+       */
+      if (node.type === '프로그램 처방') return STEP('프로그램 처방', '', [])
       /*
        * **수행 노드는 회차를 적지 않는다.** 회차의 이름·개수는 처방된 프로그램이
        * 정하고 날짜는 일정이 정한다(4.6.4절). 정의에 적어두면 세 곳이 같은 사실을

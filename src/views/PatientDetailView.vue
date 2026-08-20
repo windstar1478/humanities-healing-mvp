@@ -759,8 +759,9 @@ onBeforeRouteLeave((to, from) => {
                   >
                     <Pencil :size="16" />
                   </button>
+                  <!-- 파괴적 조작이라 경고색이다(3.1절) -->
                   <button
-                    class="flex size-11 items-center justify-center rounded-lg text-text-secondary active:bg-surface-pressed"
+                    class="flex size-11 items-center justify-center rounded-lg text-danger-fg active:bg-danger-bg"
                     @click="guard(() => { deleting = note })"
                   >
                     <Trash2 :size="16" />

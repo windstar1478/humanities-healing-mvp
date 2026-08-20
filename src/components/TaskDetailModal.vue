@@ -87,10 +87,11 @@ function toggleDone() {
     <template #actions="{ dismiss }">
       <!--
         삭제는 되돌릴 수 없어 확인을 한 번 더 거친다. 테두리만 둔 버튼으로 두는 것도
-        일정 상세와 같다 — 파괴적인 것을 강조하지 않는다
+        일정 상세와 같다 — 자리는 낮추되 **색은 경고색**이다(3.1절).
+        아이콘·글자만으로는 옆의 중립 버튼과 구별되지 않는다
       -->
       <button class="mr-auto flex h-11 items-center" @click="hand('delete')">
-        <span class="flex h-9 items-center gap-1 rounded-lg border border-border-default px-3 text-body active:bg-surface-pressed">
+        <span class="flex h-9 items-center gap-1 rounded-lg border border-danger-fg px-3 text-body text-danger-fg active:bg-danger-bg">
           <Trash2 :size="16" />삭제
         </span>
       </button>
