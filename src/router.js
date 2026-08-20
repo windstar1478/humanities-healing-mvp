@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { session } from './authState.js'
+import { findTool } from './mocks/authoring.js'
+import { surveys } from './mocks/surveys.js'
 
 /*
  * 우측 환자 패널은 '환자를 다루는 화면'에만 붙는다.
@@ -71,6 +73,31 @@ const router = createRouter({
       path: '/authoring',
       component: () => import('./views/AuthoringView.vue'),
       meta: { noPatientPanel: true },
+    },
+    /*
+     * 척도 저작. 저작도구 중 **편집 화면이 있는 첫 도구**다 —
+     * 일곱을 한꺼번에 열지 않고 하나씩 축소 버전으로 만든다.
+     * `new`면 새로 만드는 자리고, 그 밖에는 설문 코드다.
+     */
+    {
+      path: '/authoring/scale/:code',
+      component: () => import('./views/ScaleEditorView.vue'),
+      meta: { noPatientPanel: true },
+      beforeEnter: (to) =>
+        to.params.code === 'new' || surveys[to.params.code]
+          ? true
+          : { path: '/authoring/scale', replace: true },
+    },
+    /*
+     * 저작도구 하나. 어느 도구인지가 경로에 들어간다 —
+     * 새로고침·뒤로가기가 같은 도구로 돌아와야 한다(코어 프로세스의 단계와 같다).
+     * 없는 키로 들어오면 홈으로 되돌린다. 빈 화면을 남기지 않는다.
+     */
+    {
+      path: '/authoring/:tool',
+      component: () => import('./views/AuthoringToolView.vue'),
+      meta: { noPatientPanel: true },
+      beforeEnter: (to) => (findTool(to.params.tool) ? true : { path: '/authoring', replace: true }),
     },
   ],
 })

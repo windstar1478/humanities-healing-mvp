@@ -50,7 +50,12 @@ const S = (code, name, role, scope, spec) => ({
   max: spec.questions.length * Math.max(...spec.scale.map((o) => o.score)),
 })
 
-export const surveys = {
+/*
+ * **명단(`patients.js`)과 같은 이유로 반응형이다.** 저작도구의 척도 편집이
+ * 이 객체를 고치는데, 평범한 객체면 목록도 감정평가 화면도 그 자리에서
+ * 갱신되지 않는다.
+ */
+export const surveys = reactive({
   'PCL-5': S('PCL-5', 'PTSD 증상 체크리스트', '핵심', 'PTSD', {
     summary: '외상 후 스트레스 장애 평가. 다음은 매우 심한 스트레스를 경험한 사람들에게 때때로 발생할 수 있는 문제들입니다.',
     guide: '각 문항을 주의 깊게 읽고, 지난 1달 동안 다음과 같은 문제로 얼마나 고통스러웠는지를 해당하는 곳에 표시해 주세요.',
@@ -268,9 +273,36 @@ export const surveys = {
       '나는 내 결정을 믿는다.',
     ],
   }),
-}
+})
 
 export const surveyOf = (code) => surveys[code] ?? null
+
+/*
+ * 척도 저작(저작도구)의 저장.
+ *
+ * **총점은 여기서 다시 센다.** 정의를 만들 때 쓴 규칙(문항 수 × 보기 최고점)과
+ * 같은 식이어야 저작한 척도와 목업으로 심어둔 척도가 같은 자를 쓴다.
+ *
+ * 오토세이브가 없으므로(3.6절) 이 함수는 저장 버튼에서만 불린다.
+ */
+export function saveSurvey(draft) {
+  const scale = draft.scale.map((o) => ({ label: o.label.trim(), score: Number(o.score) || 0 }))
+  const questions = draft.questions.map((q) => q.trim()).filter(Boolean)
+  surveys[draft.code] = {
+    code: draft.code,
+    name: draft.name.trim(),
+    role: draft.role,
+    scope: draft.scope,
+    summary: draft.summary.trim(),
+    guide: draft.guide.trim(),
+    lead: draft.lead?.trim() || draft.guide.trim(),
+    cutoff: draft.cutoff === '' || draft.cutoff === null ? null : Number(draft.cutoff),
+    scale,
+    questions,
+    max: questions.length * Math.max(...scale.map((o) => o.score), 0),
+  }
+  return surveys[draft.code]
+}
 
 /*
  * 응답. 환자 · 시점(사전/사후) · 설문 코드로 갈린다.
