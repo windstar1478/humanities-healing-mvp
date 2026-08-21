@@ -8,3 +8,11 @@ import { seedPatients } from './mocks/seed.js'
 seedPatients()
 
 createApp(App).use(router).mount('#app')
+
+/*
+ * standalone(홈 화면에 추가)으로 띄우기 위한 등록. 워커는 캐시하지 않는다 —
+ * 배포한 것과 다른 화면이 태블릿에 남으면 실측이 어긋난다.
+ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'))
+}
