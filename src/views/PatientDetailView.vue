@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, nextTick } from 'vue'
+import { rectOf, viewW, viewH } from '../uiScale.js'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Check, Play, User,
@@ -91,7 +92,7 @@ const stepBlocked = ref(null)
 
 function openStep(i, event) {
   if (stepState(i) === 'waiting') {
-    const r = event.currentTarget.getBoundingClientRect()
+    const r = rectOf(event.currentTarget)
     stepBlocked.value = {
       title: '아직 진행할 수 없는 단계입니다',
       detail: `${josa(steps.value[currentStep.value]?.label ?? '', '을', '를')} 마치면 열립니다`,
@@ -110,7 +111,7 @@ const stepBlockedStyle = computed(() => {
   const MARGIN = 24
   const { x, y } = stepBlocked.value
   return {
-    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), window.innerWidth - WIDTH - MARGIN)}px`,
+    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), viewW() - WIDTH - MARGIN)}px`,
     top: `${y + 8}px`,
   }
 })

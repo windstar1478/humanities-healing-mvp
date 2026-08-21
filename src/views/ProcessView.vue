@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { rectOf, viewW, viewH } from '../uiScale.js'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Check, Play, User } from 'lucide-vue-next'
 import { patients } from '../mocks/patients.js'
@@ -77,7 +78,7 @@ const blocked = ref(null)
 
 function goStep(i, event) {
   if (stepState(i) === 'waiting') {
-    const r = event.currentTarget.getBoundingClientRect()
+    const r = rectOf(event.currentTarget)
     blocked.value = {
       title: '아직 진행할 수 없는 단계입니다',
       detail: `${josa(steps.value[currentStep.value]?.label ?? '', '을', '를')} 마치면 열립니다`,
@@ -95,7 +96,7 @@ const blockedStyle = computed(() => {
   const MARGIN = 24
   const { x, y } = blocked.value
   return {
-    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), window.innerWidth - WIDTH - MARGIN)}px`,
+    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), viewW() - WIDTH - MARGIN)}px`,
     top: `${y + 8}px`,
   }
 })

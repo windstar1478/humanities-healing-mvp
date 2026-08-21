@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { viewW, viewH } from '../uiScale.js'
 import { CalendarDays, ClipboardList, FileText, Workflow, BellOff } from 'lucide-vue-next'
 import { notifications, markRead, markAllRead, unreadCount } from '../mocks/notifications.js'
 
@@ -37,7 +38,7 @@ const style = computed(() => {
   return {
     left: `${right + 8}px`,
     /* 세로는 버튼 중앙에 맞추되 화면 밖으로 나가지 않게 가둔다 */
-    top: `${Math.min(Math.max(MARGIN, top + height / 2 - HEIGHT / 2), window.innerHeight - HEIGHT - MARGIN)}px`,
+    top: `${Math.min(Math.max(MARGIN, top + height / 2 - HEIGHT / 2), viewH() - HEIGHT - MARGIN)}px`,
   }
 })
 

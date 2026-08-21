@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { rectOf, viewW, viewH } from './uiScale.js'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ClipboardList, CalendarDays, Users, TrendingUp, PenTool,
@@ -49,7 +50,7 @@ const notifyAnchor = ref(null)
 const settingsOpen = ref(false)
 
 function toggleNotify(event) {
-  notifyAnchor.value = notifyAnchor.value ? null : event.currentTarget.getBoundingClientRect()
+  notifyAnchor.value = notifyAnchor.value ? null : rectOf(event.currentTarget)
 }
 
 const unread = computed(() => unreadCount())
@@ -65,8 +66,8 @@ const rejectedStyle = computed(() => {
   const GAP = 12
   const MARGIN = 24
   const { x, y } = dragState.rejected
-  const left = Math.min(x + GAP, window.innerWidth - WIDTH - MARGIN)
-  const top = Math.min(Math.max(MARGIN, y - HEIGHT / 2), window.innerHeight - HEIGHT - MARGIN)
+  const left = Math.min(x + GAP, viewW() - WIDTH - MARGIN)
+  const top = Math.min(Math.max(MARGIN, y - HEIGHT / 2), viewH() - HEIGHT - MARGIN)
   return { left: `${Math.max(MARGIN, left)}px`, top: `${top}px` }
 })
 
@@ -199,7 +200,7 @@ function toggleSort(event) {
     sortOpen.value = false
     return
   }
-  const r = event.currentTarget.getBoundingClientRect()
+  const r = rectOf(event.currentTarget)
   const WIDTH = 157
   sortAnchor.value = {
     left: `${Math.max(24, r.right - WIDTH)}px`,
@@ -244,7 +245,7 @@ onUnmounted(() => {
   -->
   <RouterView v-if="$route.meta.bare" />
 
-  <div v-else class="flex h-dvh gap-6 overflow-hidden bg-surface-canvas p-6 text-text-primary">
+  <div v-else class="flex h-app gap-6 overflow-hidden bg-surface-canvas p-6 text-text-primary">
     <!-- 좌: 네비게이션 -->
 <nav class="flex w-[137px] shrink-0 flex-col overflow-y-auto pt-3">
   <!-- 상단 메뉴 -->
@@ -470,8 +471,8 @@ onUnmounted(() => {
     <Teleport to="body">
       <div
         v-if="dragState.item"
-        class="pointer-events-none fixed z-50 w-[195px] -translate-y-1/2 opacity-50"
-        :style="{ left: `${dragState.x + 12}px`, top: `${dragState.y}px` }"
+        class="pointer-events-none fixed z-50 w-[195px] -translate-x-1/2 -translate-y-1/2 opacity-50"
+        :style="{ left: `${dragState.x}px`, top: `${dragState.y}px` }"
       >
         <div class="flex items-center gap-2 rounded-lg border border-border-default bg-surface-card py-2 pl-1">
           <template v-if="dragState.itemKind === 'patient'">

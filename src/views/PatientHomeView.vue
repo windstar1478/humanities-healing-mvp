@@ -143,7 +143,7 @@ function leave() {
 </script>
 
 <template>
-  <div v-if="patient" class="flex h-dvh flex-col gap-3 bg-surface-canvas p-6">
+  <div v-if="patient" class="flex h-app flex-col gap-3 bg-surface-canvas p-6">
     <!-- 머리. 누구의 화면인지와 나가는 길만 둔다 -->
     <header class="flex h-14 shrink-0 items-center gap-3 rounded-2xl border border-border-default bg-surface-card px-4">
       <span class="flex size-9 shrink-0 items-center justify-center rounded-full border border-border-default bg-surface-field text-text-secondary">
@@ -356,7 +356,7 @@ function leave() {
   </div>
 
   <!-- 코드는 맞지만 명단에 없는 경우. 막다른 화면으로 두지 않는다 -->
-  <div v-else class="flex h-dvh flex-col items-center justify-center gap-4 bg-surface-canvas p-6">
+  <div v-else class="flex h-app flex-col items-center justify-center gap-4 bg-surface-canvas p-6">
     <p class="text-body text-text-secondary">기록을 찾을 수 없습니다</p>
     <button
       class="flex h-11 items-center gap-1 rounded-lg border border-border-default px-3 text-body text-text-secondary active:bg-surface-pressed"

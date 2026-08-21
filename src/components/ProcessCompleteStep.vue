@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { rectOf, viewW, viewH } from '../uiScale.js'
 import { Printer } from 'lucide-vue-next'
 import { processFor } from '../mocks/processLibrary.js'
 import { surveys, responseOf } from '../mocks/surveys.js'
@@ -83,7 +84,7 @@ const percent = (value, max) =>
 /* 출력은 아직 열지 않는다. 무반응은 고장으로 읽히므로 사유를 말한다 */
 const blocked = ref(null)
 function say(event, title, detail) {
-  const r = event.currentTarget.getBoundingClientRect()
+  const r = rectOf(event.currentTarget)
   blocked.value = { title, detail, x: r.left + r.width / 2, y: r.bottom }
 }
 
@@ -93,7 +94,7 @@ const blockedStyle = computed(() => {
   const MARGIN = 24
   const { x, y } = blocked.value
   return {
-    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), window.innerWidth - WIDTH - MARGIN)}px`,
+    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), viewW() - WIDTH - MARGIN)}px`,
     top: `${y + 8}px`,
   }
 })

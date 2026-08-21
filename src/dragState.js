@@ -1,4 +1,5 @@
 import { reactive } from 'vue'
+import { toLayout } from './uiScale.js'
 
 /*
  * 셸(우측 환자 패널)과 화면(미배정 목록 · 일정 타임라인)이 함께 쓰는 공유 상태.
@@ -10,7 +11,11 @@ export const dragState = reactive({
   item: null,
   /* 'patient' | 'task' */
   itemKind: null,
-  /* 고스트가 따라갈 포인터 좌표 */
+  /*
+   * 고스트가 따라갈 포인터 좌표. **CSS가 쓰는 좌표로 옮겨 담는다** —
+   * 배율이 걸리면 포인터의 화면 좌표를 그대로 `left`에 적을 수 없다.
+   * 어느 요소 위인지 묻는 자리는 화면 좌표를 그대로 쓴다.
+   */
   x: 0,
   y: 0,
   /* 손가락 아래에 있는 드롭 가능한 시간. 없으면 null (아젠다) */
@@ -96,8 +101,8 @@ function targetUnder(x, y) {
 
 export function startPress(event, item, kind) {
   pressOrigin = { x: event.clientX, y: event.clientY }
-  dragState.x = event.clientX
-  dragState.y = event.clientY
+  dragState.x = toLayout(event.clientX)
+  dragState.y = toLayout(event.clientY)
   pressTimer = setTimeout(() => {
     dragState.item = item
     dragState.itemKind = kind
@@ -119,8 +124,8 @@ export function trackPress(event) {
  */
 export function trackDrag(event) {
   if (!dragState.item) return
-  dragState.x = event.clientX
-  dragState.y = event.clientY
+  dragState.x = toLayout(event.clientX)
+  dragState.y = toLayout(event.clientY)
   const { hour, date } = targetUnder(event.clientX, event.clientY)
   dragState.hoverHour = hour
   dragState.hoverDate = date

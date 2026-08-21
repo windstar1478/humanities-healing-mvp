@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { RouterLink } from 'vue-router'
-import { uiScale, setScale, SCALES, currentViewport } from '../uiScale.js'
+import { uiScale, setScale, SCALES, rectOf } from '../uiScale.js'
 
 /*
  * 실기기 논리 해상도 실측용 화면. **제품 화면이 아니다** —
@@ -16,7 +16,7 @@ import { uiScale, setScale, SCALES, currentViewport } from '../uiScale.js'
  */
 const v = ref({})
 
-/* 셸 루트가 h-dvh이고 p-6(24)이라 콘텐츠 높이는 dvh - 48이다 */
+/* 셸 루트가 h-app이고 p-6(24)이라 콘텐츠 높이는 dvh - 48이다 */
 const probe = ref(null)
 
 function read() {
@@ -24,9 +24,8 @@ function read() {
   v.value = {
     inner: `${window.innerWidth} × ${window.innerHeight}`,
     visual: vv ? `${Math.round(vv.width)} × ${Math.round(vv.height)}` : '없음',
-    dvh: probe.value ? `${Math.round(probe.value.getBoundingClientRect().height)}` : '-',
+    dvh: probe.value ? `${Math.round(rectOf(probe.value).height)}` : '-',
     scale: uiScale.value.toFixed(2),
-    viewport: currentViewport(),
     screen: `${window.screen.width} × ${window.screen.height}`,
     dpr: String(window.devicePixelRatio),
     orientation: window.screen.orientation?.type ?? '알 수 없음',
@@ -49,11 +48,16 @@ onBeforeUnmount(() => {
   window.visualViewport?.removeEventListener('resize', onResize)
 })
 
+function pick(v) {
+  setScale(v)
+  /* 다시 배치된 뒤의 값을 읽는다 */
+  requestAnimationFrame(read)
+}
+
 const ROWS = [
-  { key: 'inner', label: '레이아웃 뷰포트 (innerWidth × innerHeight)', want: '배율 1.00에서 1691 × 974' },
+  { key: 'inner', label: '논리 해상도 (innerWidth × innerHeight)', want: '1691 × 974' },
   { key: 'scale', label: '적용된 배율', want: '' },
-  { key: 'viewport', label: '걸려 있는 뷰포트', want: '' },
-  { key: 'dvh', label: '셸 콘텐츠 높이 (레이아웃 단위)', want: '' },
+  { key: 'dvh', label: '셸 콘텐츠 높이 (배율 적용 후)', want: '' },
   { key: 'standalone', label: 'standalone 여부', want: '예' },
   { key: 'visual', label: 'visualViewport', want: '' },
   { key: 'screen', label: 'screen (CSS px)', want: '' },
@@ -64,11 +68,11 @@ const ROWS = [
 
 <template>
   <!-- 100dvh에서 p-6을 뺀 높이를 실제로 재는 자리다. 화면 밖에 둔다 -->
-  <div class="pointer-events-none fixed top-0 left-0 h-dvh w-px -translate-x-full p-6">
+  <div class="pointer-events-none fixed top-0 left-0 h-app w-px -translate-x-full p-6">
     <div ref="probe" class="h-full"></div>
   </div>
 
-  <div class="h-dvh overflow-y-auto bg-surface-canvas p-6">
+  <div class="h-app overflow-y-auto bg-surface-canvas p-6">
     <div class="mx-auto flex max-w-[720px] flex-col gap-4">
       <div class="flex items-center justify-between">
         <h1 class="text-title-lg font-bold text-text-primary">실기기 측정</h1>
@@ -94,11 +98,34 @@ const ROWS = [
             :class="uiScale === s
               ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
               : 'border-border-default text-text-secondary active:bg-surface-pressed'"
-            @click="setScale(s)"
+            @click="pick(s)"
           >
             {{ s.toFixed(2) }}
           </button>
         </div>
+        <!--
+          예시. **작다고 지목된 자리를 그대로 옮겨 왔다** — 캘린더 칸과 일정 블록이다.
+          배율은 이 화면에도 함께 걸리므로 버튼을 누르면 여기가 그 자리에서 바뀐다.
+          숫자만 보고는 무슨 차이인지 알 수 없어 둔 것이다.
+        -->
+        <div class="flex gap-3">
+          <!-- 캘린더 칸 -->
+          <div class="flex w-[124px] shrink-0 flex-col gap-1 bg-surface-container p-1">
+            <span class="text-count text-text-primary">29</span>
+            <span class="truncate rounded-sm bg-surface-recessed px-1 text-count text-text-primary">김서준 · 감정평가</span>
+            <span class="truncate rounded-sm bg-surface-recessed px-1 text-count text-text-primary">나예솔 · 6/10</span>
+            <span class="text-count text-text-secondary">+2</span>
+          </div>
+          <!-- 일정 블록 -->
+          <div class="flex min-h-11 flex-1 items-center gap-2 rounded-lg bg-surface-container pr-3">
+            <span class="h-full w-2 shrink-0 rounded-l-lg border-l-8 border-border-strong"></span>
+            <span class="flex min-w-0 flex-col">
+              <span class="truncate text-body text-text-primary">서지원</span>
+              <span class="truncate text-caption text-text-secondary">게임과몰입 · 일반 상담</span>
+            </span>
+          </div>
+        </div>
+
         <RouterLink
           to="/"
           class="flex h-11 items-center justify-center rounded-lg bg-surface-inverse text-body text-text-inverse active:bg-surface-inverse-pressed"

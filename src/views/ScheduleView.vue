@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { rectOf, viewW, viewH } from '../uiScale.js'
 import {
   ChevronLeft, ChevronRight, ChevronRight as Caret, Plus, Check,
 } from 'lucide-vue-next'
@@ -77,7 +78,7 @@ const overflowCount = (events) => Math.max(0, events.length - 2)
 const popover = ref(null)
 
 function openDay(cell, event) {
-  const r = event.currentTarget.getBoundingClientRect()
+  const r = rectOf(event.currentTarget)
   const anchor = { right: r.right, top: r.top, height: r.height }
   /*
    * 빈 칸은 열 팝오버가 없다. 대신 그 날짜로 일정 추가를 연다.
@@ -112,9 +113,9 @@ const popoverStyle = computed(() => {
   const GAP = 8
   const MARGIN = 24
   const { right, top, height } = popover.value.anchor
-  const left = Math.min(right + GAP, window.innerWidth - WIDTH - MARGIN)
+  const left = Math.min(right + GAP, viewW() - WIDTH - MARGIN)
   const wanted = top + height / 2 - HEIGHT / 2
-  const maxTop = window.innerHeight - HEIGHT - MARGIN
+  const maxTop = viewH() - HEIGHT - MARGIN
   return {
     left: `${Math.max(MARGIN, left)}px`,
     top: `${Math.min(Math.max(MARGIN, wanted), maxTop)}px`,

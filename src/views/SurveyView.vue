@@ -124,7 +124,7 @@ function backToCounselor() {
 </script>
 
 <template>
-  <div v-if="patient && survey" class="flex h-dvh flex-col overflow-hidden bg-surface-canvas text-text-primary">
+  <div v-if="patient && survey" class="flex h-app flex-col overflow-hidden bg-surface-canvas text-text-primary">
     <!-- 제출 완료 알림. 셸을 걷은 채다 — 태블릿이 아직 환자 손에 있다 -->
     <div v-if="submitted" class="flex flex-1 flex-col items-center justify-center gap-6 px-6">
       <CircleCheckBig :size="48" class="shrink-0 text-interactive-default" />

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { rectOf, viewW, viewH } from '../uiScale.js'
 import { useRouter, RouterLink } from 'vue-router'
 import { Stethoscope, User, ArrowRight } from 'lucide-vue-next'
 import { signIn } from '../authState.js'
@@ -70,7 +71,7 @@ function pickRole(key) {
 
 const blocked = ref(null)
 function say(event, title, detail) {
-  const r = event.currentTarget.getBoundingClientRect()
+  const r = rectOf(event.currentTarget)
   blocked.value = { title, detail, x: r.left + r.width / 2, y: r.top - 64 }
 }
 
@@ -108,14 +109,14 @@ const blockedStyle = computed(() => {
   const MARGIN = 24
   const { x, y } = blocked.value
   return {
-    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), window.innerWidth - WIDTH - MARGIN)}px`,
+    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), viewW() - WIDTH - MARGIN)}px`,
     top: `${y}px`,
   }
 })
 </script>
 
 <template>
-  <div class="flex h-dvh w-full items-center justify-center bg-surface-canvas p-6">
+  <div class="flex h-app w-full items-center justify-center bg-surface-canvas p-6">
     <div class="flex w-[420px] flex-col">
       <h1 class="text-title-lg font-semibold">인문 치유 상담 지원</h1>
       <p class="mt-1 text-label text-text-secondary">누구로 시작할지 선택해 주세요</p>

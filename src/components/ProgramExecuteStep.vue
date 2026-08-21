@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { rectOf, viewW, viewH } from '../uiScale.js'
 import { Check, ArrowRight } from 'lucide-vue-next'
 import { findProgram, phasesOf } from '../mocks/programs.js'
 import { progressOf, sessionWhen, completeSession, saveSessionNote, NOTE_LIMIT } from '../mocks/sessions.js'
@@ -59,7 +60,7 @@ const editable = computed(() => entry.value && stateOf(selected.value) !== 'wait
 const blocked = ref(null)
 
 function say(event, title, detail) {
-  const r = event.currentTarget.getBoundingClientRect()
+  const r = rectOf(event.currentTarget)
   blocked.value = { title, detail, x: r.left + r.width / 2, y: r.bottom }
 }
 
@@ -94,7 +95,7 @@ const blockedStyle = computed(() => {
   const MARGIN = 24
   const { x, y } = blocked.value
   return {
-    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), window.innerWidth - WIDTH - MARGIN)}px`,
+    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), viewW() - WIDTH - MARGIN)}px`,
     top: `${y + 8}px`,
   }
 })

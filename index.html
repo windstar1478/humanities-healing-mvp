@@ -5,26 +5,22 @@
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <!--
-      화면 배율. **문서를 읽는 도중에 걸어야 한다** — 브라우저는 head를 읽으며
-      뷰포트를 정하고, 그 뒤에 태그를 고쳐도 이미 정해진 값을 다시 잡지 않는다.
-      앱 스크립트에서 걸었더니 기기에서 아무 변화가 없었던 것이 이 때문이다.
-      실기기에서 크기를 고르기 위한 임시 장치이며, 값이 정해지면 위 한 줄로 굳히고
-      이 블록과 uiScale.js·측정 화면을 함께 걷어낸다. (설계문서 6.2절 47번)
+      화면 배율. **문서를 읽는 도중에 걸어야 한다** — 앱 스크립트가 뜬 뒤에 걸면
+      화면이 한 번 작게 그려졌다가 뛴다. 실기기에서 크기를 고르기 위한 임시
+      장치이며, 값이 정해지면 여기와 uiScale.js·측정 화면을 함께 걷어내고
+      정해진 배율을 화면 코드의 치수에 반영한다. (설계문서 6.2절 47번)
+
+      뷰포트 메타(initial-scale)로 걸어 봤으나 기기에서 반영되지 않았다.
     -->
     <script>
       try {
         var s = Number(localStorage.getItem('tablet-app:ui-scale'))
         if (s > 1) {
-          /*
-           * 배율과 폭을 **둘 다** 적는다. 둘이 같은 값을 가리키므로 어느 쪽을 읽는
-           * 브라우저든 같은 결과가 나온다. `width=device-width`는 쓰면 안 된다 —
-           * 넓은 쪽이 이겨서 배율이 통째로 무시된다.
-           */
-          var w = Math.round((screen.width || 0) / s)
-          document.getElementById('viewport').setAttribute('content',
-            (w > 320 ? 'width=' + w + ', ' : '') + 'initial-scale=' + s + ', viewport-fit=cover')
+          document.documentElement.style.zoom = s
+          /* 화면 높이(h-app)가 읽는다. zoom은 뷰포트 단위까지 줄여주지 않는다 */
+          document.documentElement.style.setProperty('--ui-scale', s)
         }
       } catch (e) { /* 저장소를 못 읽으면 기본 배율이다 */ }
     </script>

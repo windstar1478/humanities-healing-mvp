@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import { rectOf, viewW, viewH } from '../uiScale.js'
 import { Search, ArrowUpDown, ChevronDown, ChevronRight, Check, ArrowRight, SearchX } from 'lucide-vue-next'
 import { processFor } from '../mocks/processLibrary.js'
 import { surveys, responseOf, gradeOf } from '../mocks/surveys.js'
@@ -75,7 +76,7 @@ const pickedProgram = computed(() => (picked.value ? findProgram(picked.value) :
 const blocked = ref(null)
 
 function say(event, title, detail) {
-  const r = event.currentTarget.getBoundingClientRect()
+  const r = rectOf(event.currentTarget)
   blocked.value = { title, detail, x: r.left + r.width / 2, y: r.bottom }
 }
 
@@ -93,7 +94,7 @@ const blockedStyle = computed(() => {
   const MARGIN = 24
   const { x, y } = blocked.value
   return {
-    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), window.innerWidth - WIDTH - MARGIN)}px`,
+    left: `${Math.min(Math.max(MARGIN, x - WIDTH / 2), viewW() - WIDTH - MARGIN)}px`,
     top: `${y + 8}px`,
   }
 })

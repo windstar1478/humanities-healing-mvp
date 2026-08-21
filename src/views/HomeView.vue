@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import { rectOf, viewW, viewH } from '../uiScale.js'
 import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, ArrowUpDown, Check, Star,
 } from 'lucide-vue-next'
@@ -253,7 +254,7 @@ function confirmDeleteTask() {
 const rowPopover = ref(null)
 
 function anchorOf(event) {
-  const r = event.currentTarget.getBoundingClientRect()
+  const r = rectOf(event.currentTarget)
   return { left: r.left, top: r.top, height: r.height }
 }
 
@@ -306,7 +307,7 @@ const rowPopoverStyle = computed(() => {
   const wanted = top + height / 2 - HEIGHT / 2
   return {
     left: `${Math.max(MARGIN, left - WIDTH - GAP)}px`,
-    top: `${Math.min(Math.max(MARGIN, wanted), window.innerHeight - HEIGHT - MARGIN)}px`,
+    top: `${Math.min(Math.max(MARGIN, wanted), viewH() - HEIGHT - MARGIN)}px`,
     /* 콜아웃은 문구 길이에 맞춰 줄어든다. 목록 팝오버만 고정 폭이다 */
     ...(rowPopover.value.warning ? { maxWidth: `${WIDTH}px` } : { width: `${WIDTH}px` }),
   }
