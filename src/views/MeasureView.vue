@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { RouterLink } from 'vue-router'
+import { uiScale, setScale, SCALES } from '../uiScale.js'
 
 /*
  * 실기기 논리 해상도 실측용 화면. **제품 화면이 아니다** —
@@ -24,6 +25,7 @@ function read() {
     inner: `${window.innerWidth} × ${window.innerHeight}`,
     visual: vv ? `${Math.round(vv.width)} × ${Math.round(vv.height)}` : '없음',
     dvh: probe.value ? `${Math.round(probe.value.getBoundingClientRect().height)}` : '-',
+    scale: uiScale.value.toFixed(2),
     screen: `${window.screen.width} × ${window.screen.height}`,
     dpr: String(window.devicePixelRatio),
     orientation: window.screen.orientation?.type ?? '알 수 없음',
@@ -47,8 +49,9 @@ onBeforeUnmount(() => {
 })
 
 const ROWS = [
-  { key: 'inner', label: '논리 해상도 (innerWidth × innerHeight)', want: '1138 × 651 근처' },
-  { key: 'dvh', label: '셸 콘텐츠 높이 (100dvh − 48)', want: '603 근처' },
+  { key: 'inner', label: '레이아웃 뷰포트 (innerWidth × innerHeight)', want: '배율 1.00에서 1691 × 974' },
+  { key: 'scale', label: '적용된 배율', want: '' },
+  { key: 'dvh', label: '셸 콘텐츠 높이 (레이아웃 단위)', want: '' },
   { key: 'standalone', label: 'standalone 여부', want: '예' },
   { key: 'visual', label: 'visualViewport', want: '' },
   { key: 'screen', label: 'screen (CSS px)', want: '' },
@@ -72,6 +75,33 @@ const ROWS = [
           class="flex h-11 items-center rounded-lg border border-border-default px-3 text-body text-text-secondary active:bg-surface-pressed"
         >
           로그인으로
+        </RouterLink>
+      </div>
+
+      <!--
+        배율 고르기. **임시 장치다** — 숫자로 정할 수 없는 문제라 기기에서
+        눌러가며 비교할 자리를 둔다. 고른 값은 기기에 남아 다른 화면에도 그대로 걸린다.
+      -->
+      <div class="flex flex-col gap-2 rounded-lg border border-border-default bg-surface-card px-3 py-2">
+        <span class="text-label text-text-secondary">화면 배율 — 눌러 보고 고르세요</span>
+        <div class="flex gap-2">
+          <button
+            v-for="s in SCALES"
+            :key="s"
+            class="h-11 flex-1 rounded-lg border text-body font-medium transition-colors duration-100 ease-standard"
+            :class="uiScale === s
+              ? 'border-border-selected bg-selected-bg text-text-primary active:bg-selected-bg-pressed'
+              : 'border-border-default text-text-secondary active:bg-surface-pressed'"
+            @click="setScale(s)"
+          >
+            {{ s.toFixed(2) }}
+          </button>
+        </div>
+        <RouterLink
+          to="/"
+          class="flex h-11 items-center justify-center rounded-lg bg-surface-inverse text-body text-text-inverse active:bg-surface-inverse-pressed"
+        >
+          이 배율로 업무 화면 보기
         </RouterLink>
       </div>
 

@@ -12,6 +12,7 @@ import { statusOf } from './mocks/process.js'
 import { visitsOf } from './scheduleState.js'
 import {
   dragState, startPress, trackPress, trackDrag, endPress, cancelDrag, clearRejected,
+  suppressTouchScroll,
   swallowDragClick, beginGesture,
 } from './dragState.js'
 import { unreadCount } from './mocks/notifications.js'
@@ -219,6 +220,8 @@ onMounted(() => {
   window.addEventListener('pointerup', endPress)
   window.addEventListener('pointercancel', cancelDrag)
   window.addEventListener('pointermove', trackDrag)
+  /* passive: false가 아니면 preventDefault가 무시된다 */
+  window.addEventListener('touchmove', suppressTouchScroll, { passive: false })
   /* 배치로 끝난 제스처의 click을 삼킨다. 캡처 단계라야 행에 닿기 전에 잡는다 */
   window.addEventListener('click', swallowDragClick, true)
 })
@@ -227,6 +230,7 @@ onUnmounted(() => {
   window.removeEventListener('pointerup', endPress)
   window.removeEventListener('pointercancel', cancelDrag)
   window.removeEventListener('pointermove', trackDrag)
+  window.removeEventListener('touchmove', suppressTouchScroll)
   window.removeEventListener('click', swallowDragClick, true)
   cancelDrag()
 })

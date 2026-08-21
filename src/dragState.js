@@ -150,6 +150,25 @@ export function endPress(event) {
   resetDrag()
 }
 
+/*
+ * 배치 중에는 브라우저가 이 제스처를 스크롤로 가져가지 못하게 막는다.
+ *
+ * 패널도 목록도 스크롤 상자라, 꾹 누르기가 걸린 뒤 손가락이 움직이면
+ * 브라우저가 스크롤을 시작하면서 `pointercancel`을 쏜다 — 배치가 그
+ * 자리에서 끊긴다. 마우스에는 이 이벤트가 없어 PC에서는 드러나지 않는다.
+ *
+ * `touch-action`으로는 막을 수 없다. 제스처가 시작될 때 한 번 읽는 값이라
+ * 도중에 바꿔도 이미 진행 중인 제스처에는 걸리지 않고, 행에 미리 걸어두면
+ * 목록을 손가락으로 굴릴 수 없게 된다. **첫 움직임을 취소해** 스크롤이
+ * 시작되지 못하게 하는 것이 유일하게 맞는 자리다.
+ *
+ * 등록할 때 `passive: false`를 반드시 줄 것 — 기본값이 passive라
+ * `preventDefault`가 조용히 무시된다.
+ */
+export function suppressTouchScroll(event) {
+  if (dragState.item && event.cancelable) event.preventDefault()
+}
+
 export function clearRejected() {
   dragState.rejected = null
 }
