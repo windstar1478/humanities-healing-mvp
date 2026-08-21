@@ -36,15 +36,6 @@ const router = createRouter({
       component: () => import('./views/PatientHomeView.vue'),
       meta: { bare: true, role: 'patient' },
     },
-    /*
-     * 실기기 논리 해상도 실측용. **제품 화면이 아니다** — 값이 확정되면 걷어낸다.
-     * 셸도 로그인도 걷는다: 재려는 것이 셸을 그리기 전의 뷰포트다.
-     */
-    {
-      path: '/measure',
-      component: () => import('./views/MeasureView.vue'),
-      meta: { bare: true, public: true },
-    },
     { path: '/',         component: () => import('./views/HomeView.vue') },
     { path: '/schedule', component: () => import('./views/ScheduleView.vue') },
     { path: '/patients', component: () => import('./views/PatientsView.vue') },

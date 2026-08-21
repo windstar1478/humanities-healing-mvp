@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { rectOf, viewW, viewH } from '../uiScale.js'
-import { useRouter, RouterLink } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { Stethoscope, User, ArrowRight } from 'lucide-vue-next'
 import { signIn } from '../authState.js'
 import { patientByCode, sampleCode } from '../mocks/accessCodes.js'
@@ -171,16 +171,6 @@ const blockedStyle = computed(() => {
           프로토타입입니다. 입력한 값은 검사하지 않고 어디에도 보내지 않습니다.
         </template>
       </p>
-      <!--
-        실기기 측정으로 가는 임시 문. standalone에는 주소창이 없어 이 링크가
-        없으면 측정 화면에 닿을 길이 없다. **논리 해상도가 확정되면 걷어낸다.**
-      -->
-      <RouterLink
-        to="/measure"
-        class="mx-auto mt-2 flex h-11 items-center text-count text-text-secondary active:text-text-primary"
-      >
-        실기기 측정
-      </RouterLink>
     </div>
 
     <Teleport to="body">

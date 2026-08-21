@@ -6,7 +6,11 @@
 Figma에서 hi-fi 디자인이 대부분 완성된 상태이며, 이를 클릭 가능한 프로토타입으로 구현하는 것이 목표.
 
 - **대상 기기**: Samsung Galaxy Tab S11 Ultra, 가로(landscape) 전용
-- **논리 해상도**: 1138×712 (추정값, 실기기 실측 미완료)
+- **논리 해상도**: **1691×974** (실기기 실측 확정). dpr 1.75 · 화면 전체 1691×1056
+- **화면 배율 1.25** — 화면 코드의 치수는 **Figma 값 그대로 두고** `style.css`의
+  `:root`에서 `zoom`으로 한 번에 건다. 실측 해상도가 Figma 프레임(1138×712 추정)보다
+  1.49배 넓어 그대로 두면 본문 글자가 2.8mm(휴대폰 본문 크기)가 된다.
+  **치수를 곱하지 말 것** — 기기가 바뀌면 그 한 줄만 바꾼다
 - **데이터**: mock 데이터만 사용. 백엔드 연동 없음
 - **범위 제외**: 환자용 화면, 웹 리뉴얼
 
@@ -22,7 +26,19 @@ Vite + Vue 3 (JavaScript) + Tailwind CSS v4 + vue-router + lucide-vue-next
 
 ## 레이아웃 규칙 (필수)
 
-- 루트는 `h-dvh`. **고정 px 높이 금지** — 주소창 유무, 소프트 키보드로 높이가 변함
+- 루트는 **`h-app`**(= `100dvh / 배율`). **고정 px 높이 금지** — 주소창 유무, 소프트 키보드로 높이가 변함
+  - `h-dvh`를 쓰지 말 것. 뷰포트 단위는 `zoom`을 따라 줄지 않아 셸이 화면 아래로 넘친다
+- **배율이 화면 좌표와 CSS 좌표를 가른다.** `getBoundingClientRect`·`clientX`는
+  화면 픽셀로 오는데 `left`·`top`에 적는 값은 배율 이전 좌표다.
+  **무엇을 어디에 놓을지 정하는 자리는 `uiScale.js`를 거칠 것** —
+  `rectOf(el)` · `toLayout(n)` · `viewW()` · `viewH()`.
+  `elementFromPoint`처럼 **어느 요소 위인지 묻는 자리는 화면 좌표 그대로** 쓴다
+- **꾹 눌러 배치하는 동안에는 브라우저의 스크롤 가로채기를 막는다**
+  (`dragState.js`의 `suppressTouchScroll`, `touchmove`에 `passive: false`).
+  막지 않으면 스크롤 상자 안에서 손가락이 움직이는 순간 `pointercancel`이 와서
+  배치가 끊긴다 — 마우스에는 이 이벤트가 없어 PC에서 드러나지 않는다.
+  `touch-action`으로는 안 된다(제스처 시작 때 한 번 읽고, 행에 걸면 목록이 안 굴러간다)
+- **드래그 고스트는 손가락 가운데**다. 비켜 두면 무엇을 어디에 놓는지 어긋나 보인다
 - 3분할 셸: 좌우 패널 고정 폭 + `shrink-0`, 중앙 `flex-1`
 - 스크롤은 각 패널 내부(`overflow-y-auto`)만. 페이지 전체 스크롤 금지
 - 주소창 없는 PWA standalone 모드로 배포 예정
@@ -1094,7 +1110,7 @@ Figma는 `.mcp.json`의 원격 서버(`https://mcp.figma.com/mcp`)로 읽는다.
 
 ### 검증 방법
 
-`preview_start`로 dev 서버를 띄우고 뷰포트를 1138×712로 맞춘 뒤,
+`preview_start`로 dev 서버를 띄우고 뷰포트를 **1691×974**로 맞춘 뒤,
 브라우저에서 **DOM을 직접 측정**해 Figma 값과 대조해 왔다. 스크린샷만으로는
 1~2px 차이나 토큰 오적용이 드러나지 않는다. 드래그는 `PointerEvent`를 직접
 dispatch해 검증한다(`pointerdown` → 500ms 대기 → `pointermove` → `pointerup`).
@@ -1123,10 +1139,6 @@ dispatch해 검증한다(`pointerdown` → 500ms 대기 → `pointermove` → `p
 `history.back()`의 popstate를 라우터가 route 이동으로 처리해 다른 화면으로 튕긴다.
 
 미해결:
-- 실기기 논리 해상도 실측 (기기 미수령). Figma 프레임 1138×712도 추정값
-  - 712에는 상태바 + 제스처바 61이 포함되어 있고, Figma 셸 콘텐츠는 603
-  - PWA standalone 뷰포트는 시스템 UI를 제외하므로 `100dvh` ≈ 651 → `p-6` 제하면 603이 자연히 나온다
-  - **따라서 603을 하드코딩하지 말 것.** 실기기에서 `innerHeight`가 651 근처인지만 확인하면 확정
 - `interactive/pressed`가 다크모드에서 `default`와 동일 (brand/300) → pressed 피드백 소실
 - `interactive/primary-fill`(neutral/900) vs 다크 `surface/canvas`(neutral/950) 명도 차 부족
 - 효과성 분석 · 저작도구 화면은 Figma 디자인 자체가 미완성
