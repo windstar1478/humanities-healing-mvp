@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { RouterLink } from 'vue-router'
-import { uiScale, setScale, SCALES } from '../uiScale.js'
+import { uiScale, setScale, SCALES, currentViewport } from '../uiScale.js'
 
 /*
  * 실기기 논리 해상도 실측용 화면. **제품 화면이 아니다** —
@@ -26,6 +26,7 @@ function read() {
     visual: vv ? `${Math.round(vv.width)} × ${Math.round(vv.height)}` : '없음',
     dvh: probe.value ? `${Math.round(probe.value.getBoundingClientRect().height)}` : '-',
     scale: uiScale.value.toFixed(2),
+    viewport: currentViewport(),
     screen: `${window.screen.width} × ${window.screen.height}`,
     dpr: String(window.devicePixelRatio),
     orientation: window.screen.orientation?.type ?? '알 수 없음',
@@ -51,6 +52,7 @@ onBeforeUnmount(() => {
 const ROWS = [
   { key: 'inner', label: '레이아웃 뷰포트 (innerWidth × innerHeight)', want: '배율 1.00에서 1691 × 974' },
   { key: 'scale', label: '적용된 배율', want: '' },
+  { key: 'viewport', label: '걸려 있는 뷰포트', want: '' },
   { key: 'dvh', label: '셸 콘텐츠 높이 (레이아웃 단위)', want: '' },
   { key: 'standalone', label: 'standalone 여부', want: '예' },
   { key: 'visual', label: 'visualViewport', want: '' },

@@ -30,26 +30,17 @@ const saved = (() => {
 export const uiScale = ref(saved)
 
 /*
- * `initial-scale`이 1보다 크면 레이아웃 뷰포트가 그만큼 좁아지고, 화면 코드의
- * 1px이 물리적으로 그만큼 커진다. `width=device-width`를 함께 주면 안 된다 —
- * 둘 중 넓은 쪽이 이겨서 배율이 무시된다.
+ * **배율을 거는 자리는 여기가 아니라 `index.html`의 head다.** 브라우저는 문서를
+ * 읽으며 뷰포트를 정하고, 그 뒤에 태그를 고쳐도 다시 잡지 않는다 — 여기서 걸었더니
+ * 기기에서 아무 변화가 없었다. 이 모듈은 값을 남기고 문서를 새로 읽게만 한다.
  */
-export function applyScale() {
-  const meta = document.querySelector('meta[name="viewport"]')
-  if (!meta) return
-  meta.setAttribute('content', uiScale.value === 1
-    ? 'width=device-width, initial-scale=1, viewport-fit=cover'
-    : `initial-scale=${uiScale.value}, viewport-fit=cover`)
-}
-
 export function setScale(v) {
   if (v === uiScale.value) return
-  uiScale.value = v
-  try { localStorage.setItem(KEY, String(v)) } catch { /* 저장 못 해도 이번 세션은 적용된다 */ }
-  applyScale()
-  /*
-   * 메타를 바꾼 것만으로 다시 배치되지 않는 경우가 있어 확실하게 새로 읽는다.
-   * 고른 값은 기기에 남아 있으므로 잃는 것이 없다.
-   */
+  try { localStorage.setItem(KEY, String(v)) } catch { /* 저장 못 하면 배율을 바꿀 수 없다 */ }
   location.reload()
+}
+
+/* 지금 걸려 있는 뷰포트. 기기에서 배율이 실제로 먹었는지 눈으로 확인하는 자리다 */
+export function currentViewport() {
+  return document.querySelector('meta[name="viewport"]')?.getAttribute('content') ?? '없음'
 }
